@@ -105,19 +105,10 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
 
         canvas.add(rect);
 
-        // Only set as active object if no other object is selected
-        if (!canvas.getActiveObject()) {
-            canvas.setActiveObject(rect);
-        }
-
-        // Update selection info
-        if (onSelectionChange) {
-            onSelectionChange(rect);
-        }
-
-        // Render once after adding
+        // Don't set as active object or trigger selection change during initial rendering
+        // This prevents issues with coordinate syncing before the canvas is fully set up
         canvas.requestRenderAll();
-    }, [onSelectionChange]);
+    }, []);
 
     /**
      * Render all detection boxes from the API response
@@ -187,6 +178,7 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
         if (canvasContainerRef.current) {
             canvasContainerRef.current.innerHTML = '';
         }
+        boxIdMapRef.current.clear(); // Clear the ID mapping on cleanup
     }, []);
 
     /**
@@ -279,12 +271,18 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
         const canvas = fabricCanvasRef.current;
         if (!canvas) return null;
 
+        console.log(`Looking for box with ID: ${boxId}`);
+        console.log(`Current boxIdMap entries:`, Array.from(boxIdMapRef.current.entries()));
+
         // Find the fabric object by ID
         for (const [obj, id] of boxIdMapRef.current.entries()) {
             if (id === boxId) {
+                console.log(`Found box ${boxId}, returning coordinates`);
                 return getOriginalCoordinates(obj);
             }
         }
+
+        console.log(`Box ${boxId} not found in boxIdMap`);
         return null;
     }, [getOriginalCoordinates]);
 
