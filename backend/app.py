@@ -1,100 +1,141 @@
-from flask import Flask, request, jsonify, send_from_directory
-from werkzeug.utils import secure_filename
+"""
+AutoExtract Backend Application
+
+A Flask-based web application that provides APIs for automatic data extraction
+from various types of graphs and charts using deep learning models.
+
+This application offers:
+- Bar graph analysis with YOLO-based object detection
+- OCR text extraction from graph elements
+- Interactive coordinate and value editing
+- RESTful API endpoints for frontend integration
+
+Author: Mohan Yang
+Repository: https://github.com/HenryYang03/AutoExtract.git
+"""
+
+from flask import Flask, jsonify
 import os
-import cv2
-from bar_graph_analyzer import BarGraphAnalyzer
 
-app = Flask(__name__)
-app.secret_key = "b'\xca\xa4\xf2\x80!\xfe\x85\xba\xd7\xcf\xe7\xc9\xf1)I\xac\x10Y5M\x95\xed\xfb\xc4'"
+from config import UPLOAD_DIR, SECRET_KEY, HOST, PORT, DEBUG
+from model_manager import model_manager
+from routes import handle_bar_analyzer, handle_update_values, handle_uploaded_file
 
-# Resolve paths relative to this file
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, 'static', 'uploads')
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
 
-# Resolve model path relative to this file
-model_path = os.path.join(BASE_DIR, 'models', 'best.pt')
-class_names = ['label', 'ymax', 'origin', 'yaxis', 'bar', 'uptail', 'legend', 'legend_group', 'xaxis', 'x_group']
-analyzer = BarGraphAnalyzer(model_path, class_names, pytesseract_cmd='tesseract')
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg'}
-
-def clear_upload_folder():
-    upload_dir = app.config['UPLOAD_FOLDER']
-    if not os.path.isdir(upload_dir):
-        os.makedirs(upload_dir, exist_ok=True)
-        return
-    for filename in os.listdir(upload_dir):
-        file_path = os.path.join(upload_dir, filename)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-        except Exception as e:
-            print(f'Failed to delete {file_path}. Reason: {e}')
-
-@app.route('/api/bar_analyzer', methods=['POST'])
-def api_bar_analyzer():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-
-    # Ensure a concrete string for type checkers
-    filename_raw = (file.filename or "")
-
-    if file and allowed_file(filename_raw):
-        filename = secure_filename(filename_raw)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        clear_upload_folder()
-        file.save(filepath)
-
-        try:
-            analyzer.detect_box(filepath)
-            detection_boxes = analyzer.detections
-            img = analyzer.image
-            if img is None:
-                return jsonify({'error': 'Failed to process image'}), 400
-            image_shape = list(img.shape[:2])
-            return jsonify({
-                'filename': filename,
-                'detection_boxes': detection_boxes,
-                'image_shape': image_shape,
-                'image_url': f'/static/uploads/{filename}',
-                'origin_value': analyzer.origin_value,
-                'ymax_value': analyzer.ymax_value
-            })
-        except ValueError as e:
-            return jsonify({'error': str(e)}), 400
-
-    return jsonify({'error': 'Invalid file type'}), 400
-
-@app.route('/api/update_values', methods=['POST'])
-def api_update_values():
-    try:
-        data = request.get_json()
-        origin_value = data.get('origin_value')
-        ymax_value = data.get('ymax_value')
+def create_app() -> Flask:
+    """
+    Create and configure the Flask application.
+    
+    This factory function creates a Flask app instance, configures it,
+    registers routes, and ensures required directories exist.
+    
+    Returns:
+        Flask: Configured Flask application instance
         
-        if origin_value is not None:
-            analyzer.origin_value = origin_value
-        if ymax_value is not None:
-            analyzer.ymax_value = ymax_value
-            
-        return jsonify({
-            'success': True,
-            'origin_value': analyzer.origin_value,
-            'ymax_value': analyzer.ymax_value
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+    Example:
+        >>> app = create_app()
+        >>> app.run()
+    """
+    # Create Flask app
+    app = Flask(__name__)
+    
+    # Configure app
+    app.secret_key = SECRET_KEY
+    app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
+    
+    # Ensure upload directory exists
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    
+    # Register routes
+    register_routes(app)
+    
+    # Register error handlers
+    register_error_handlers(app)
+    
+    return app
 
-@app.route('/static/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+def register_routes(app: Flask) -> None:
+    """
+    Register all API routes with the Flask application.
+    
+    Args:
+        app (Flask): Flask application instance to register routes with
+        
+    Routes:
+        POST /api/bar_analyzer: Process uploaded images for graph analysis
+        POST /api/update_values: Update origin and ymax values
+        GET /static/uploads/<filename>: Serve uploaded files
+    """
+    # API routes
+    app.add_url_rule(
+        '/api/bar_analyzer',
+        'bar_analyzer',
+        handle_bar_analyzer,
+        methods=['POST']
+    )
+    
+    app.add_url_rule(
+        '/api/update_values',
+        'update_values',
+        handle_update_values,
+        methods=['POST']
+    )
+    
+    # File serving route
+    app.add_url_rule(
+        '/static/uploads/<filename>',
+        'uploaded_file',
+        handle_uploaded_file
+    )
+
+
+def register_error_handlers(app: Flask) -> None:
+    """
+    Register error handlers for the Flask application.
+    
+    Args:
+        app (Flask): Flask application instance to register error handlers with
+    """
+    
+    @app.errorhandler(404)
+    def not_found(error):
+        """Handle 404 Not Found errors."""
+        return jsonify({'error': 'Resource not found'}), 404
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 Internal Server errors."""
+        return jsonify({'error': 'Internal server error'}), 500
+    
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        """Handle unhandled exceptions."""
+        return jsonify({'error': 'An unexpected error occurred'}), 500
+
+
+def main():
+    """
+    Main entry point for the application.
+    
+    Creates the Flask app, checks model readiness, and starts the server.
+    """
+    # Create and configure app
+    app = create_app()
+    
+    # Check if model is ready
+    if not model_manager.is_ready():
+        print("Warning: BarGraphAnalyzer model failed to initialize!")
+        print("The application may not function properly.")
+    else:
+        print("✓ BarGraphAnalyzer model initialized successfully")
+    
+    # Start the server
+    print(f"Starting AutoExtract backend server on {HOST}:{PORT}")
+    print(f"Debug mode: {'ON' if DEBUG else 'OFF'}")
+    
+    app.run(host=HOST, port=PORT, debug=DEBUG)
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=9000, debug=True)
+    main()

@@ -1,0 +1,19 @@
+# Core web
+Flask==3.0.3
+
+# Computer vision & OCR
+opencv-python==4.9.0.80
+pytesseract==0.3.10
+Pillow==10.3.0
+imutils==0.5.4
+numpy==1.26.4
+
+# Deep learning (YOLOv5 via torch.hub)
+torch==2.3.0
+torchvision==0.18.0
+
+# Utilities
+requests==2.32.3
+PyYAML==6.0.1
+tqdm==4.66.4
+typing_extensions==4.12.0
