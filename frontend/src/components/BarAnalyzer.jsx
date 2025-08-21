@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as fabric from 'fabric';
 
-const MAX_CANVAS_WIDTH = 800;
+const MAX_CANVAS_WIDTH = 500;
 
 const BarAnalyzer = () => {
     const [file, setFile] = useState(null);
@@ -133,34 +133,7 @@ const BarAnalyzer = () => {
             });
             rect.data = { label };
 
-            // Delete control
-            rect.controls.deleteControl = new fabric.Control({
-                x: 0.5, y: -0.5, offsetY: 16,
-                cursorStyle: 'pointer',
-                mouseUpHandler: function (_, transform) {
-                    const canvas = transform.target.canvas;
-                    canvas.remove(transform.target);
-                    canvas.requestRenderAll();
-                    setSelectedInfo(null);
-                },
-                render: function (ctx, left, top, _, fabricObject) {
-                    const size = this.cornerSize;
-                    ctx.save();
-                    ctx.translate(left, top);
-                    ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle));
-                    // Simple red X
-                    ctx.strokeStyle = 'red';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(-size / 2, -size / 2);
-                    ctx.lineTo(size / 2, size / 2);
-                    ctx.moveTo(size / 2, -size / 2);
-                    ctx.lineTo(-size / 2, size / 2);
-                    ctx.stroke();
-                    ctx.restore();
-                },
-                cornerSize: 24
-            });
+            // Removed in-canvas delete control; use panel's Delete Selected instead
 
             canvas.add(rect);
             canvas.setActiveObject(rect);
@@ -183,12 +156,6 @@ const BarAnalyzer = () => {
                 createRect(100, 50, 120, 60, 'new');
             };
         }
-
-        // Double click to add box
-        canvas.on('mouse:dblclick', opt => {
-            const pointer = canvas.getPointer(opt.e);
-            createRect(pointer.x, pointer.y, 100, 60, 'new');
-        });
 
         // Selection events → external panel
         canvas.on('selection:created', e => updatePanel(e.selected?.[0]));
@@ -219,40 +186,44 @@ const BarAnalyzer = () => {
     };
 
     return (
-        <div>
-            <h1>Bar Analyzer</h1>
-            <p>Upload a bar graph image to detect all relevant components.</p>
+        <div className="container-fluid">
+            <div className="row">
+                {/* Left: 3/7 area for title and upload */}
+                <div className="col-lg-4 col-md-5 pe-lg-4">
+                    <h1>Bar Analyzer</h1>
+                    <p>Upload a bar graph image to detect all relevant components.</p>
 
-            {error && <div className="alert alert-danger">{error}</div>}
+                    {error && <div className="alert alert-danger">{error}</div>}
 
-            <form onSubmit={handleUpload} className="form-group">
-                <input type="file" onChange={handleFileChange} required />
-                <button type="submit" className="btn btn-primary">Upload</button>
-            </form>
+                    <form onSubmit={handleUpload} className="form-group">
+                        <input type="file" onChange={handleFileChange} required />
+                        <button type="submit" className="btn btn-primary ms-2">Upload</button>
+                    </form>
+                </div>
 
-            {filename && (
-                <div className="card mt-3">
-                    <div className="card-header d-flex justify-content-between align-items-center">
+                {/* Right: 7/7 area for canvas and info with separator */}
+                <div className="col-lg-8 col-md-7 ps-lg-4 border-start">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
                         <span>Interactive Detection Viewer</span>
                         <button className="btn btn-sm btn-success" id="addBoxBtn">+ Add Box</button>
                     </div>
-                    <div className="card-body">
-                        {selectedInfo && (
-                            <div className="alert alert-info d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>Category:</strong> {selectedInfo.label} &nbsp;&nbsp;
-                                    <strong>Coords:</strong> x={selectedInfo.coords.x}, y={selectedInfo.coords.y}, w={selectedInfo.coords.w}, h={selectedInfo.coords.h}
-                                </div>
-                                <button className="btn btn-sm btn-outline-danger" onClick={deleteSelected}>Delete Selected</button>
+
+                    {selectedInfo && (
+                        <div className="alert alert-info d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Category:</strong> {selectedInfo.label} &nbsp;&nbsp;
+                                <strong>Coords:</strong> x={selectedInfo.coords.x}, y={selectedInfo.coords.y}, w={selectedInfo.coords.w}, h={selectedInfo.coords.h}
                             </div>
-                        )}
-                        <div ref={canvasContainerRef} />
-                        <small className="form-text text-muted mt-2">
-                            Double-click to add box, drag to move/resize, or use the Delete Selected button.
-                        </small>
-                    </div>
+                            <button className="btn btn-sm btn-outline-danger" onClick={deleteSelected}>Delete Selected</button>
+                        </div>
+                    )}
+
+                    <div ref={canvasContainerRef} />
+                    <small className="form-text text-muted mt-2 d-block">
+                        Drag to move/resize the box, use the Delete Selected button to remove boxes.
+                    </small>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
