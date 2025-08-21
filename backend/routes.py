@@ -105,30 +105,83 @@ def handle_update_values() -> Tuple[Dict[str, Any], int]:
         data = request.get_json()
         if not data:
             return {'error': 'No JSON data provided'}, 400
-        
-        # Get analyzer instance
-        analyzer = model_manager.get_analyzer()
-        
-        # Update values if provided
+            
         origin_value = data.get('origin_value')
         ymax_value = data.get('ymax_value')
         
-        if origin_value is not None:
-            analyzer.origin_value = origin_value
-        if ymax_value is not None:
-            analyzer.ymax_value = ymax_value
+        if origin_value is None or ymax_value is None:
+            return {'error': 'Both origin_value and ymax_value are required'}, 400
+            
+        # Get analyzer instance and update values
+        analyzer = model_manager.get_analyzer()
+        analyzer.origin_value = origin_value
+        analyzer.ymax_value = ymax_value
         
-        # Return updated values
-        response_data = {
+        return {
             'success': True,
             'origin_value': analyzer.origin_value,
             'ymax_value': analyzer.ymax_value
-        }
-        
-        return response_data, 200
+        }, 200
         
     except Exception as e:
-        return {'error': f'Failed to update values: {str(e)}'}, 400
+        return {'error': f'Failed to update values: {str(e)}'}, 500
+
+
+def handle_update_box_coordinates() -> Tuple[Dict[str, Any], int]:
+    """
+    Handle requests to update box coordinates when moved on the frontend.
+    
+    This endpoint allows updating the coordinates of detection boxes
+    when they are moved or resized on the interactive canvas.
+    
+    Returns:
+        Tuple[Dict[str, Any], int]: JSON response and HTTP status code
+        
+    Example Request:
+        {
+            "box_id": "bar_1",
+            "x1": 100,
+            "y1": 50,
+            "x2": 200,
+            "y2": 150
+        }
+        
+    Example Response:
+        {
+            "success": true,
+            "message": "Box coordinates updated successfully"
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return {'error': 'No JSON data provided'}, 400
+            
+        box_id = data.get('box_id')
+        x1 = data.get('x1')
+        y1 = data.get('y1')
+        x2 = data.get('x2')
+        y2 = data.get('y2')
+        
+        if not all(v is not None for v in [box_id, x1, y1, x2, y2]):
+            return {'error': 'All coordinates (box_id, x1, y1, x2, y2) are required'}, 400
+            
+        # Get analyzer instance and update box coordinates
+        analyzer = model_manager.get_analyzer()
+        success = analyzer.update_box_coordinates(box_id, x1, y1, x2, y2)
+        
+        if success:
+            return {
+                'success': True,
+                'message': 'Box coordinates updated successfully'
+            }, 200
+        else:
+            return {'error': f'Box with ID {box_id} not found'}, 404
+        
+    except ValueError as e:
+        return {'error': f'Invalid coordinates: {str(e)}'}, 400
+    except Exception as e:
+        return {'error': f'Failed to update box coordinates: {str(e)}'}, 500
 
 
 def handle_uploaded_file(filename: str) -> Any:

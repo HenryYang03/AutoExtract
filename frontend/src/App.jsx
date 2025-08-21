@@ -45,19 +45,24 @@ function App() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-light text-center py-3 mt-4" style={{
+      <footer className="bg-light text-center py-2 mt-4" style={{
         position: "fixed",
         bottom: 0,
-        right: 0,
+        left: 0,
         backgroundColor: "white",
-        padding: "10px",
-        borderTopLeftRadius: "10px",
-        boxShadow: "-2px -2px 5px rgba(0, 0, 0, 0.1)"
+        padding: "8px",
+        borderTopRightRadius: "10px",
+        boxShadow: "2px -2px 5px rgba(0, 0, 0, 0.1)"
       }}>
-        <p>
-          By Mohan Yang |{' '}
-          <a href="https://github.com/HenryYang03/AutoData_Extraction_from_plots.git" target="_blank" rel="noopener noreferrer">
-            GitHub Repository
+        <p className="mb-0 small">
+          <a href="https://xulab.anat.uci.edu/" target="_blank" rel="noopener noreferrer" className="me-3">
+            Xulab
+          </a>
+          <a href="https://ics.uci.edu/~zhaoxia/" target="_blank" rel="noopener noreferrer" className="me-3">
+            Yulab
+          </a>
+          <a href="https://github.com/HenryYang03/AutoExtract" target="_blank" rel="noopener noreferrer">
+            GitHub
           </a>
         </p>
       </footer>

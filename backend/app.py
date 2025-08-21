@@ -19,7 +19,7 @@ import os
 
 from config import UPLOAD_DIR, SECRET_KEY, HOST, PORT, DEBUG
 from model_manager import model_manager
-from routes import handle_bar_analyzer, handle_update_values, handle_uploaded_file
+from routes import handle_bar_analyzer, handle_update_values, handle_update_box_coordinates, handle_uploaded_file
 
 
 def create_app() -> Flask:
@@ -79,6 +79,13 @@ def register_routes(app: Flask) -> None:
         '/api/update_values',
         'update_values',
         handle_update_values,
+        methods=['POST']
+    )
+    
+    app.add_url_rule(
+        '/api/update_box_coordinates',
+        'update_box_coordinates',
+        handle_update_box_coordinates,
         methods=['POST']
     )
     
