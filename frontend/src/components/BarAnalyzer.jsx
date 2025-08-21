@@ -17,6 +17,12 @@ const BarAnalyzer = () => {
     const [selectedInfo, setSelectedInfo] = useState(null);
     const scaleRef = useRef(1);
 
+    // Origin and ymax values
+    const [originValue, setOriginValue] = useState('');
+    const [ymaxValue, setYmaxValue] = useState('');
+    const [editingOrigin, setEditingOrigin] = useState('');
+    const [editingYmax, setEditingYmax] = useState('');
+
     const handleFileChange = (event) => {
         setFile(event.target.files[0]);
         setFilename(event.target.files[0].name);
@@ -40,6 +46,10 @@ const BarAnalyzer = () => {
                 setDetectionBoxes(data.detection_boxes);
                 setImageShape(data.image_shape);
                 setImageUrl(data.image_url);
+                setOriginValue(data.origin_value || '');
+                setYmaxValue(data.ymax_value || '');
+                setEditingOrigin(data.origin_value || '');
+                setEditingYmax(data.ymax_value || '');
                 setError('');
             } else {
                 const errorMsg = await response.text();
@@ -47,6 +57,33 @@ const BarAnalyzer = () => {
             }
         } catch (err) {
             setError('Error uploading file');
+        }
+    };
+
+    const handleUpdateValues = async () => {
+        try {
+            const response = await fetch('/api/update_values', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    origin_value: editingOrigin,
+                    ymax_value: editingYmax
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setOriginValue(data.origin_value);
+                setYmaxValue(data.ymax_value);
+                setEditingOrigin(data.origin_value);
+                setEditingYmax(data.ymax_value);
+            } else {
+                console.error('Failed to update values');
+            }
+        } catch (err) {
+            console.error('Error updating values:', err);
         }
     };
 
@@ -207,6 +244,44 @@ const BarAnalyzer = () => {
                         <span>Interactive Detection Viewer</span>
                         <button className="btn btn-sm btn-success" id="addBoxBtn">+ Add Box</button>
                     </div>
+
+                    {/* Origin and Ymax values display and editing */}
+                    {(originValue || ymaxValue) && (
+                        <div className="alert alert-secondary mb-2">
+                            <div className="row align-items-center">
+                                <div className="col-md-6">
+                                    <div className="d-flex align-items-center gap-2">
+                                        <strong>ymax:</strong>
+                                        <input
+                                            type="number"
+                                            className="form-control form-control-sm"
+                                            placeholder="ymax"
+                                            value={editingYmax}
+                                            onChange={(e) => setEditingYmax(e.target.value)}
+                                            style={{ width: '80px' }}
+                                        />
+                                        <strong>origin:</strong>
+                                        <input
+                                            type="number"
+                                            className="form-control form-control-sm"
+                                            placeholder="origin"
+                                            value={editingOrigin}
+                                            onChange={(e) => setEditingOrigin(e.target.value)}
+                                            style={{ width: '80px' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="col-md-6 text-end">
+                                    <button
+                                        className="btn btn-sm btn-primary"
+                                        onClick={handleUpdateValues}
+                                    >
+                                        Update
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {selectedInfo && (
                         <div className="alert alert-info d-flex justify-content-between align-items-center">

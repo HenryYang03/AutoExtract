@@ -63,12 +63,34 @@ def api_bar_analyzer():
                 'filename': filename,
                 'detection_boxes': detection_boxes,
                 'image_shape': image_shape,
-                'image_url': f'/static/uploads/{filename}'
+                'image_url': f'/static/uploads/{filename}',
+                'origin_value': analyzer.origin_value,
+                'ymax_value': analyzer.ymax_value
             })
         except ValueError as e:
             return jsonify({'error': str(e)}), 400
 
     return jsonify({'error': 'Invalid file type'}), 400
+
+@app.route('/api/update_values', methods=['POST'])
+def api_update_values():
+    try:
+        data = request.get_json()
+        origin_value = data.get('origin_value')
+        ymax_value = data.get('ymax_value')
+        
+        if origin_value is not None:
+            analyzer.origin_value = origin_value
+        if ymax_value is not None:
+            analyzer.ymax_value = ymax_value
+            
+        return jsonify({
+            'success': True,
+            'origin_value': analyzer.origin_value,
+            'ymax_value': analyzer.ymax_value
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/static/uploads/<filename>')
 def uploaded_file(filename):
