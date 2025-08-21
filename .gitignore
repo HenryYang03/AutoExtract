@@ -1,0 +1,78 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+*.egg
+build/
+dist/
+.python-version
+.env
+.venv
+venv/
+ENV/
+Pipfile.lock
+
+# Python tooling
+.mypy_cache/
+.pytest_cache/
+.pyre/
+.coverage
+htmlcov/
+.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# Node
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+yarn.lock
+package-lock.json
+
+# Frontend build outputs
+frontend/dist/
+frontend/.vite/
+*.local
+
+# Backend artifacts
+backend/venv/
+backend/.env
+backend/__pycache__/
+backend/static/uploads/
+backend/*.db
+backend/*.sqlite3
+
+# Model weights and large data
+backend/models/*.pt
+backend/models/*.pth
+backend/models/*.onnx
+backend/models/*.tflite
+backend/data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+*.bak
+*.tmp
+*.temp 
