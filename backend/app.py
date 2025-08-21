@@ -6,9 +6,15 @@ from bar_graph_analyzer import BarGraphAnalyzer
 
 app = Flask(__name__)
 app.secret_key = "b'\xca\xa4\xf2\x80!\xfe\x85\xba\xd7\xcf\xe7\xc9\xf1)I\xac\x10Y5M\x95\xed\xfb\xc4'"
-app.config['UPLOAD_FOLDER'] = 'static/uploads/'
 
-model_path = 'models/best.pt'
+# Resolve paths relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, 'static', 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
+
+# Resolve model path relative to this file
+model_path = os.path.join(BASE_DIR, 'models', 'best.pt')
 class_names = ['label', 'ymax', 'origin', 'yaxis', 'bar', 'uptail', 'legend', 'legend_group', 'xaxis', 'x_group']
 analyzer = BarGraphAnalyzer(model_path, class_names, pytesseract_cmd='tesseract')
 
@@ -16,8 +22,12 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg'}
 
 def clear_upload_folder():
-    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    upload_dir = app.config['UPLOAD_FOLDER']
+    if not os.path.isdir(upload_dir):
+        os.makedirs(upload_dir, exist_ok=True)
+        return
+    for filename in os.listdir(upload_dir):
+        file_path = os.path.join(upload_dir, filename)
         try:
             if os.path.isfile(file_path) or os.path.islink(file_path):
                 os.unlink(file_path)
@@ -33,8 +43,11 @@ def api_bar_analyzer():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
+    # Ensure a concrete string for type checkers
+    filename_raw = (file.filename or "")
+
+    if file and allowed_file(filename_raw):
+        filename = secure_filename(filename_raw)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         clear_upload_folder()
         file.save(filepath)
@@ -42,7 +55,10 @@ def api_bar_analyzer():
         try:
             analyzer.detect_box(filepath)
             detection_boxes = analyzer.detections
-            image_shape = list(analyzer.image.shape[:2])
+            img = analyzer.image
+            if img is None:
+                return jsonify({'error': 'Failed to process image'}), 400
+            image_shape = list(img.shape[:2])
             return jsonify({
                 'filename': filename,
                 'detection_boxes': detection_boxes,

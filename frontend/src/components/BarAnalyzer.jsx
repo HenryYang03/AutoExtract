@@ -10,8 +10,12 @@ const BarAnalyzer = () => {
     const [imageShape, setImageShape] = useState([]);
     const [imageUrl, setImageUrl] = useState('');
     const [error, setError] = useState('');
-    const canvasRef = useRef(null);
+    const canvasContainerRef = useRef(null);
     const fabricCanvasRef = useRef(null);
+
+    // External selection info (shown above canvas)
+    const [selectedInfo, setSelectedInfo] = useState(null);
+    const scaleRef = useRef(1);
 
     const handleFileChange = (event) => {
         setFile(event.target.files[0]);
@@ -50,15 +54,27 @@ const BarAnalyzer = () => {
     useEffect(() => {
         if (!imageUrl || !imageShape.length) return;
 
-        // Remove previous canvas if exists
+        // Dispose previous canvas if exists and clear container
         if (fabricCanvasRef.current) {
             fabricCanvasRef.current.dispose();
+            fabricCanvasRef.current = null;
+        }
+        if (canvasContainerRef.current) {
+            canvasContainerRef.current.innerHTML = '';
         }
 
         const [imgHeight, imgWidth] = imageShape;
         const scale = MAX_CANVAS_WIDTH / imgWidth;
+        scaleRef.current = scale;
 
-        const canvas = new fabric.Canvas(canvasRef.current, {
+        // Create a canvas element imperatively so React doesn't manage it
+        const canvasEl = document.createElement('canvas');
+        canvasEl.id = 'detectionCanvas';
+        canvasEl.style.border = '1px solid #ccc';
+        canvasEl.style.display = 'block';
+        canvasContainerRef.current?.appendChild(canvasEl);
+
+        const canvas = new fabric.Canvas(canvasEl, {
             selection: true,
             preserveObjectStacking: true,
             width: imgWidth * scale,
@@ -84,7 +100,29 @@ const BarAnalyzer = () => {
             canvas.renderAll();  // or canvas.requestRenderAll();
         };
 
-        // Helper to create a detection box
+        // Helper to update external info panel
+        function updatePanel(target) {
+            if (!target) {
+                setSelectedInfo(null);
+                return;
+            }
+            const s = scaleRef.current || 1;
+            const left = target.left || 0;
+            const top = target.top || 0;
+            const width = target.getScaledWidth ? target.getScaledWidth() : (target.width || 0) * (target.scaleX || 1);
+            const height = target.getScaledHeight ? target.getScaledHeight() : (target.height || 0) * (target.scaleY || 1);
+            setSelectedInfo({
+                label: target.data?.label || '',
+                coords: {
+                    x: Math.round(left / s),
+                    y: Math.round(top / s),
+                    w: Math.round(width / s),
+                    h: Math.round(height / s)
+                }
+            });
+        }
+
+        // Helper to create a detection box (no in-canvas label)
         function createRect(left, top, width, height, label = '') {
             const rect = new fabric.Rect({
                 left, top, width, height,
@@ -93,6 +131,7 @@ const BarAnalyzer = () => {
                 strokeWidth: 2,
                 objectCaching: false
             });
+            rect.data = { label };
 
             // Delete control
             rect.controls.deleteControl = new fabric.Control({
@@ -102,6 +141,7 @@ const BarAnalyzer = () => {
                     const canvas = transform.target.canvas;
                     canvas.remove(transform.target);
                     canvas.requestRenderAll();
+                    setSelectedInfo(null);
                 },
                 render: function (ctx, left, top, _, fabricObject) {
                     const size = this.cornerSize;
@@ -122,23 +162,9 @@ const BarAnalyzer = () => {
                 cornerSize: 24
             });
 
-            const text = new fabric.Text(label, {
-                fontSize: 14,
-                fill: 'green',
-                left: left + 4,
-                top: top - 18,
-                selectable: false
-            });
-
-            const group = new fabric.Group([rect, text], {
-                left, top,
-                hasControls: true,
-                hasBorders: true,
-                lockUniScaling: false
-            });
-
-            canvas.add(group);
-            canvas.setActiveObject(group);
+            canvas.add(rect);
+            canvas.setActiveObject(rect);
+            updatePanel(rect);
         }
 
         // Draw detection boxes
@@ -164,11 +190,33 @@ const BarAnalyzer = () => {
             createRect(pointer.x, pointer.y, 100, 60, 'new');
         });
 
+        // Selection events → external panel
+        canvas.on('selection:created', e => updatePanel(e.selected?.[0]));
+        canvas.on('selection:updated', e => updatePanel(e.selected?.[0]));
+        canvas.on('selection:cleared', () => setSelectedInfo(null));
+
         // Clean up on unmount
         return () => {
-            canvas.dispose();
+            if (fabricCanvasRef.current) {
+                fabricCanvasRef.current.dispose();
+                fabricCanvasRef.current = null;
+            }
+            if (canvasContainerRef.current) {
+                canvasContainerRef.current.innerHTML = '';
+            }
         };
     }, [detectionBoxes, imageUrl, imageShape]);
+
+    const deleteSelected = () => {
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) return;
+        const obj = canvas.getActiveObject();
+        if (obj) {
+            canvas.remove(obj);
+            canvas.requestRenderAll();
+            setSelectedInfo(null);
+        }
+    };
 
     return (
         <div>
@@ -189,13 +237,18 @@ const BarAnalyzer = () => {
                         <button className="btn btn-sm btn-success" id="addBoxBtn">+ Add Box</button>
                     </div>
                     <div className="card-body">
-                        <canvas
-                            ref={canvasRef}
-                            id="detectionCanvas"
-                            style={{ border: '1px solid #ccc', display: 'block' }}
-                        ></canvas>
+                        {selectedInfo && (
+                            <div className="alert alert-info d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Category:</strong> {selectedInfo.label} &nbsp;&nbsp;
+                                    <strong>Coords:</strong> x={selectedInfo.coords.x}, y={selectedInfo.coords.y}, w={selectedInfo.coords.w}, h={selectedInfo.coords.h}
+                                </div>
+                                <button className="btn btn-sm btn-outline-danger" onClick={deleteSelected}>Delete Selected</button>
+                            </div>
+                        )}
+                        <div ref={canvasContainerRef} />
                         <small className="form-text text-muted mt-2">
-                            Double-click to add box, drag to move/resize, or click ❌ icon to delete.
+                            Double-click to add box, drag to move/resize, or use the Delete Selected button.
                         </small>
                     </div>
                 </div>
