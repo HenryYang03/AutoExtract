@@ -373,14 +373,46 @@ class BarGraphAnalyzer:
             height = (uptail_ymax - uptail_ymin) * scale_factor
             uptail_heights.append(height)
 
+        # Generate bar names - use x_label_texts if available, otherwise generate default names
+        bar_names = []
+        num_bars = len(bar_heights)
+        
+        if self.x_label_texts and len(self.x_label_texts) >= num_bars:
+            # Use existing x_label_texts
+            bar_names = self.x_label_texts[:num_bars]
+        else:
+            # Generate default names: Bar 1, Bar 2, etc.
+            bar_names = [f"Bar {i+1}" for i in range(num_bars)]
+            # Update self.x_label_texts with the generated names
+            self.x_label_texts = bar_names.copy()
+
         results[self.label_text] = {
             "bar_heights": bar_heights,
             "uptail_heights": uptail_heights,
             "origin_value": origin_value,
             "ymax_value": ymax_value,
-            "bar_label_texts": self.x_label_texts if self.x_label_texts else "No x-group label",
+            "bar_names": bar_names,  # Use the generated/updated names
         }
         return results
+
+    def update_bar_names(self, bar_names: List[str]) -> bool:
+        """
+        Update the bar names in x_label_texts.
+        
+        Args:
+            bar_names: List of new bar names
+            
+        Returns:
+            bool: True if update was successful
+        """
+        try:
+            if len(bar_names) != len(self.bars):
+                return False
+            
+            self.x_label_texts = bar_names.copy()
+            return True
+        except Exception:
+            return False
 
 
 if __name__ == "__main__":

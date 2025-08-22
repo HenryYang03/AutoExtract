@@ -238,6 +238,52 @@ def handle_calculate_heights() -> Tuple[Dict[str, Any], int]:
         return {'error': f'Failed to calculate heights: {str(e)}'}, 500
 
 
+def handle_update_bar_names() -> Tuple[Dict[str, Any], int]:
+    """
+    Handle requests to update bar names.
+    
+    This endpoint allows updating the names of bars in the analysis results.
+    
+    Returns:
+        Tuple[Dict[str, Any], int]: JSON response and HTTP status code
+        
+    Example Request:
+        {
+            "bar_names": ["Control", "Treatment A", "Treatment B"]
+        }
+        
+    Example Response:
+        {
+            "success": true,
+            "message": "Bar names updated successfully"
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return {'error': 'No JSON data provided'}, 400
+            
+        bar_names = data.get('bar_names')
+        if not bar_names or not isinstance(bar_names, list):
+            return {'error': 'bar_names must be a list'}, 400
+            
+        # Get analyzer instance and update bar names
+        analyzer = model_manager.get_analyzer()
+        success = analyzer.update_bar_names(bar_names)
+        
+        if success:
+            return {
+                'success': True, 
+                'message': 'Bar names updated successfully',
+                'bar_names': bar_names
+            }, 200
+        else:
+            return {'error': 'Failed to update bar names. Number of names must match number of bars.'}, 400
+        
+    except Exception as e:
+        return {'error': f'Failed to update bar names: {str(e)}'}, 500
+
+
 def handle_uploaded_file(filename: str) -> Any:
     """
     Serve uploaded files from the uploads directory.

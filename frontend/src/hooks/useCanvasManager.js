@@ -13,7 +13,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import * as fabric from 'fabric';
 
-const MAX_CANVAS_WIDTH = 500;
+const MAX_CANVAS_WIDTH = 700;
 
 export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelectionChange, onBoxMove) => {
     const canvasContainerRef = useRef(null);
@@ -38,7 +38,7 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
 
         canvasContainerRef.current?.appendChild(canvasEl);
 
-        return new fabric.Canvas(canvasEl, {
+        const canvas = new fabric.Canvas(canvasEl, {
             selection: true,
             preserveObjectStacking: true,
             width: width * scale,
@@ -47,6 +47,135 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
             skipTargetFind: false,     // Keep target finding for selection
             enableRetinaScaling: false // Disable retina scaling for better performance
         });
+
+        // Customize control appearance for better visibility
+        customizeControls(canvas);
+
+        return canvas;
+    }, []);
+
+    /**
+     * Customize the appearance of Fabric.js control handles
+     * @param {fabric.Canvas} canvas - The canvas instance
+     */
+    const customizeControls = useCallback((canvas) => {
+        // Customize control handle appearance
+        fabric.Object.prototype.controls = {
+            // Top-left corner - resize and rotate
+            tl: new fabric.Control({
+                x: -0.5,
+                y: -0.5,
+                actionHandler: fabric.controlsUtils.scalingEqually,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scale'
+            }),
+            // Top-right corner
+            tr: new fabric.Control({
+                x: 0.5,
+                y: -0.5,
+                actionHandler: fabric.controlsUtils.scalingEqually,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scale'
+            }),
+            // Bottom-left corner
+            bl: new fabric.Control({
+                x: -0.5,
+                y: 0.5,
+                actionHandler: fabric.controlsUtils.scalingEqually,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scale'
+            }),
+            // Bottom-right corner
+            br: new fabric.Control({
+                x: 0.5,
+                y: 0.5,
+                actionHandler: fabric.controlsUtils.scalingEqually,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scale'
+            }),
+            // Middle-left - horizontal resize
+            ml: new fabric.Control({
+                x: -0.5,
+                y: 0,
+                actionHandler: fabric.controlsUtils.scalingXOrSkewingY,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scaleX'
+            }),
+            // Middle-right - horizontal resize
+            mr: new fabric.Control({
+                x: 0.5,
+                y: 0,
+                actionHandler: fabric.controlsUtils.scalingXOrSkewingY,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scaleX'
+            }),
+            // Middle-top - vertical resize
+            mt: new fabric.Control({
+                x: 0,
+                y: -0.5,
+                actionHandler: fabric.controlsUtils.scalingYOrSkewingX,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scaleY'
+            }),
+            // Middle-bottom - vertical resize
+            mb: new fabric.Control({
+                x: 0,
+                y: 0.5,
+                actionHandler: fabric.controlsUtils.scalingYOrSkewingX,
+                cursorStyleHandler: fabric.controlsUtils.scalingCursorStyleHandler,
+                render: renderControl,
+                actionName: 'scaleY'
+            }),
+            // Rotation handle
+            mtr: new fabric.Control({
+                x: 0,
+                y: -0.7,
+                actionHandler: fabric.controlsUtils.rotationWithSnapping,
+                cursorStyleHandler: fabric.controlsUtils.rotationCursorStyleHandler,
+                offsetY: -30,
+                render: renderControl,
+                actionName: 'rotate'
+            })
+        };
+    }, []);
+
+    /**
+     * Custom render function for control handles
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {number} left - Left position
+     * @param {number} top - Top position
+     * @param {fabric.Control} control - The control instance
+     */
+    const renderControl = useCallback((ctx, left, top, control) => {
+        const size = 8; // Smaller size for better precision
+        const halfSize = size / 2;
+
+        // Draw a filled circle with border
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(left, top, halfSize, 0, 2 * Math.PI);
+
+        // Fill with white for better visibility
+        ctx.fillStyle = 'white';
+        ctx.fill();
+
+        // Add a colored border based on control type
+        if (control.actionName === 'rotate') {
+            ctx.strokeStyle = '#0066cc'; // Blue for rotation
+        } else {
+            ctx.strokeStyle = '#cc6600'; // Orange for resize
+        }
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
     }, []);
 
     /**

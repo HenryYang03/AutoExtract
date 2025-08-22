@@ -177,4 +177,35 @@ export const validateFile = (file) => {
     }
 
     return { isValid: true, error: null };
+};
+
+/**
+ * Update bar names in the backend
+ * 
+ * @param {Array<string>} barNames - Array of new bar names
+ * @returns {Promise<Object>} Response from the backend
+ * @throws {Error} If the update fails
+ */
+export const updateBarNames = async (barNames) => {
+    try {
+        const response = await fetch('/api/update_bar_names', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bar_names: barNames }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update bar names');
+        }
+
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            throw new Error('Network error: Unable to reach the backend server');
+        }
+        throw error;
+    }
 }; 
