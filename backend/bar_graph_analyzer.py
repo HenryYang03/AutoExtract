@@ -300,18 +300,7 @@ class BarGraphAnalyzer:
                          'ymaxes', 'labels', 'x_groups', 'legends', 'legend_groups']
         return dict(zip(category_names, self._category_dicts))
 
-    def analyze_image(self) -> Dict[str, Any]:
-        """
-        Compute derived measurements such as heights for detected bars.
 
-        Returns:
-            A dictionary keyed by the chart title/label containing:
-            - bar_heights: list of computed values per bar
-            - uptail_heights: list of computed uptail heights
-            - origin_value, ymax_value
-            - bar_label_texts: list of x labels or fallback string
-        """
-        return self.calculate_heights()
 
 
 
@@ -389,8 +378,6 @@ class BarGraphAnalyzer:
         results[self.label_text] = {
             "bar_heights": bar_heights,
             "uptail_heights": uptail_heights,
-            "origin_value": origin_value,
-            "ymax_value": ymax_value,
             "bar_names": bar_names,  # Use the generated/updated names
         }
         return results

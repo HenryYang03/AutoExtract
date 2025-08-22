@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { calculateHeights, updateBarNames } from '../services/apiService';
+import { exportToCSV, exportToExcel } from '../utils/exportUtils';
 
 const HeightCalculator = ({
     onCalculate,
@@ -69,6 +70,64 @@ const HeightCalculator = ({
         } finally {
             setIsUpdatingNames(false);
         }
+    };
+
+    /**
+ * Convert results to long format for export
+ */
+    const convertToLongFormat = (results) => {
+        const longFormatData = [];
+
+        Object.entries(results).forEach(([chartLabel, chartData]) => {
+            const { bar_heights, uptail_heights, bar_names } = chartData;
+
+            // Create one row per bar with mean (bar height), error (uptail height), and group (bar name)
+            bar_heights.forEach((barHeight, index) => {
+                const uptailHeight = uptail_heights[index] || 0;
+                const groupName = bar_names[index] || `Bar ${index + 1}`;
+
+                longFormatData.push({
+                    mean: barHeight,
+                    error: uptailHeight,
+                    group: groupName
+                });
+            });
+        });
+
+        return longFormatData;
+    };
+
+    /**
+     * Get filename from chart label or use default
+     */
+    const getFilename = () => {
+        if (!results) return 'bar_analysis_results';
+        const chartLabel = Object.keys(results)[0];
+        // Clean the label for filename (remove special characters, limit length)
+        const cleanLabel = chartLabel
+            ? chartLabel.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 50)
+            : 'bar_analysis_results';
+        return cleanLabel || 'bar_analysis_results';
+    };
+
+    /**
+     * Handle CSV export
+     */
+    const handleExportCSV = () => {
+        if (!results) return;
+        const longFormatData = convertToLongFormat(results);
+        const filename = getFilename();
+        exportToCSV(longFormatData, filename);
+    };
+
+    /**
+     * Handle Excel export
+     */
+    const handleExportExcel = () => {
+        if (!results) return;
+        const longFormatData = convertToLongFormat(results);
+        const filename = getFilename();
+        exportToExcel(longFormatData, filename);
     };
 
     /**
@@ -231,6 +290,73 @@ const HeightCalculator = ({
                             </div>
                         </div>
                     ))}
+
+                    {/* Export Buttons */}
+                    <div className="mt-3">
+                        <div className="d-flex gap-2">
+                            <button
+                                type="button"
+                                className="btn btn-outline-success"
+                                onClick={handleExportCSV}
+                                disabled={!results}
+                            >
+                                <i className="bi bi-file-earmark-text me-2"></i>
+                                Export to CSV
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-outline-primary"
+                                onClick={handleExportExcel}
+                                disabled={!results}
+                            >
+                                <i className="bi bi-file-earmark-excel me-2"></i>
+                                Export to Excel
+                            </button>
+                        </div>
+                        <small className="text-muted d-block mt-2">
+                            <i className="bi bi-info-circle me-1"></i>
+                            Data will be exported with columns: mean (bar height), error (uptail height), group (bar name)
+                        </small>
+
+                        {/* Export Data Preview */}
+                        <div className="mt-3">
+                            <h6 className="text-info mb-2">
+                                <i className="bi bi-table me-2"></i>
+                                Export Data Preview (Mean, Error, Group Format)
+                            </h6>
+                            <div className="table-responsive">
+                                <table className="table table-sm table-bordered">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th>Mean</th>
+                                            <th>Error</th>
+                                            <th>Group</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {convertToLongFormat(results).slice(0, 2).map((row, index) => (
+                                            <tr key={index}>
+                                                <td>{typeof row.mean === 'number' ? row.mean.toFixed(2) : row.mean}</td>
+                                                <td>{typeof row.error === 'number' ? row.error.toFixed(2) : row.error}</td>
+                                                <td>{row.group}</td>
+                                            </tr>
+                                        ))}
+                                        {convertToLongFormat(results).length > 2 && (
+                                            <tr>
+                                                <td colSpan="3" className="text-center text-muted">
+                                                    ... and {convertToLongFormat(results).length - 2} more rows
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <small className="text-muted">
+                                <i className="bi bi-info-circle me-1"></i>
+                                This preview shows the first 2 rows. Full export will include all data.
+                            </small>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

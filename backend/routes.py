@@ -198,16 +198,14 @@ def handle_calculate_heights() -> Tuple[Dict[str, Any], int]:
     Returns:
         Tuple[Dict[str, Any], int]: JSON response and HTTP status code
         
-    Example Response:
+            Example Response:
         {
             "success": true,
             "results": {
                 "chart_label": {
                     "bar_heights": [6.5, 8.2],
                     "uptail_heights": [0.8, 1.2],
-                    "origin_value": 0,
-                    "ymax_value": 25,
-                    "bar_label_texts": ["Group A", "Group B"]
+                    "bar_names": ["Group A", "Group B"]
                 }
             }
         }
