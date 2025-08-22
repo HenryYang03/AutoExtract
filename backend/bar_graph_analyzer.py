@@ -3,7 +3,7 @@ from __future__ import annotations
 import cv2
 import torch
 import pytesseract
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 
 from vision_utils import crop_with_padding, ocr_text, ocr_number
 
@@ -43,6 +43,8 @@ class BarGraphAnalyzer:
         # Semantic elements
         self.origin_value: float | str = 0
         self.ymax_value: float | str = 0
+        self.origin_conversion_error: str | None = None
+        self.ymax_conversion_error: str | None = None
         self.x_label_texts: List[str] = []
         self.label_text: str = ""
 
@@ -57,6 +59,18 @@ class BarGraphAnalyzer:
         self.x_groups: Dict[str, Dict[str, Any]] = {}
         self.legends: Dict[str, Dict[str, Any]] = {}
         self.legend_groups: Dict[str, Dict[str, Any]] = {}
+        
+    @property
+    def _category_dicts(self) -> List[Dict[str, Any]]:
+        """
+        Dynamically return the current category dictionaries.
+        This ensures we always have the latest references.
+        """
+        return [
+            self.bars, self.uptails, self.yaxis, self.xaxis,
+            self.origins, self.ymaxes, self.labels,
+            self.x_groups, self.legends, self.legend_groups
+        ]
 
     def detect_box(self, image_path: str) -> None:
         """
@@ -89,16 +103,45 @@ class BarGraphAnalyzer:
         # First organize detections with IDs
         self._organize_detections()
 
-        # Then group and extract attributes (now with IDs available)
-        self.bars, self.uptails, self.yaxis, self.xaxis, origin, ymax, label, x_groups = self.filter_detections()
+        # Extract single objects for calculations (since we need one of each type)
+        yaxis = next(iter(self.yaxis.values())) if self.yaxis else None
+        xaxis = next(iter(self.xaxis.values())) if self.xaxis else None
+        origin = next(iter(self.origins.values())) if self.origins else None
+        ymax = next(iter(self.ymaxes.values())) if self.ymaxes else None
+        label = next(iter(self.labels.values())) if self.labels else None
+        x_groups = list(self.x_groups.values())
 
-        # OCR numeric values
-        self.origin_value = self.extract_numbers(self.image, origin)
-        self.ymax_value = self.extract_numbers(self.image, ymax)
+        # Validate required components
+        if not yaxis or not xaxis:
+            raise ValueError("No y-axis or x-axis detected in the image.")
+        if not ymax or not origin:
+            raise ValueError("No ymaxes or origins detected in the image.")
+        if not self.bars:
+            raise ValueError("No bars detected in the image.")
 
+        # OCR numeric values and validate conversion
+        origin_text = self.extract_numbers(self.image, origin)
+        ymax_text = self.extract_numbers(self.image, ymax)
+        
+        # Try to convert to numbers and store conversion status
+        self.origin_value = origin_text
+        self.ymax_value = ymax_text
+        self.origin_conversion_error = None
+        self.ymax_conversion_error = None
+        
+        try:
+            float(origin_text)
+        except ValueError:
+            self.origin_conversion_error = f"Manual input needed for origin value: '{origin_text}'"
+            
+        try:
+            float(ymax_text)
+        except ValueError:
+            self.ymax_conversion_error = f"Manual input needed for ymax value: '{ymax_text}'"
+        
         # OCR x-axis labels and main label
         self.x_label_texts = []
-        for x_label in x_groups:  # x_groups is now a list, not dict
+        for x_label in x_groups:
             self.x_label_texts.append(self.extract_text(self.image, x_label))
 
         if label is not None:
@@ -122,44 +165,29 @@ class BarGraphAnalyzer:
         self.legends = {}
         self.legend_groups = {}
         
-        # Organize detections by label
-        bars_list = []
-        uptails_list = []
-        yaxis_list = []
-        xaxis_list = []
-        origins_list = []
-        ymaxes_list = []
-        labels_list = []
-        x_groups_list = []
-        legends_list = []
-        legend_groups_list = []
+        # Organize detections by label using a mapping
+        detection_lists = {
+            'bar': [],
+            'uptail': [],
+            'yaxis': [],
+            'xaxis': [],
+            'origin': [],
+            'ymax': [],
+            'label': [],
+            'x_group': [],
+            'legend': [],
+            'legend_group': []
+        }
         
         for detection in self.detections:
-            if detection['label'] == 'bar':
-                bars_list.append(detection)
-            elif detection['label'] == 'uptail':
-                uptails_list.append(detection)
-            elif detection['label'] == 'yaxis':
-                yaxis_list.append(detection)
-            elif detection['label'] == 'xaxis':
-                xaxis_list.append(detection)
-            elif detection['label'] == 'origin':
-                origins_list.append(detection)
-            elif detection['label'] == 'ymax':
-                ymaxes_list.append(detection)
-            elif detection['label'] == 'label':
-                labels_list.append(detection)
-            elif detection['label'] == 'x_group':
-                x_groups_list.append(detection)
-            elif detection['label'] == 'legend':
-                legends_list.append(detection)
-            elif detection['label'] == 'legend_group':
-                legend_groups_list.append(detection)
+            label = detection['label']
+            if label in detection_lists:
+                detection_lists[label].append(detection)
         
         # Sort by x1 coordinate where applicable
-        sorted_bars = sorted(bars_list, key=lambda bar: bar['x1'])
-        sorted_uptails = sorted(uptails_list, key=lambda uptail: uptail['x1'])
-        sorted_x_groups = sorted(x_groups_list, key=lambda x_group: x_group['x1'])
+        sorted_bars = sorted(detection_lists['bar'], key=lambda bar: bar['x1'])
+        sorted_uptails = sorted(detection_lists['uptail'], key=lambda uptail: uptail['x1'])
+        sorted_x_groups = sorted(detection_lists['x_group'], key=lambda x_group: x_group['x1'])
         
         # Assign sequential IDs and organize
         for i, bar in enumerate(sorted_bars):
@@ -172,27 +200,27 @@ class BarGraphAnalyzer:
             uptail['id'] = new_id
             self.uptails[new_id] = uptail
             
-        for i, yaxis in enumerate(yaxis_list):
+        for i, yaxis in enumerate(detection_lists['yaxis']):
             new_id = f"yaxis_{i+1}"
             yaxis['id'] = new_id
             self.yaxis[new_id] = yaxis
             
-        for i, xaxis in enumerate(xaxis_list):
+        for i, xaxis in enumerate(detection_lists['xaxis']):
             new_id = f"xaxis_{i+1}"
             xaxis['id'] = new_id
             self.xaxis[new_id] = xaxis
             
-        for i, origin in enumerate(origins_list):
+        for i, origin in enumerate(detection_lists['origin']):
             new_id = f"origin_{i+1}"
             origin['id'] = new_id
             self.origins[new_id] = origin
             
-        for i, ymax in enumerate(ymaxes_list):
+        for i, ymax in enumerate(detection_lists['ymax']):
             new_id = f"ymax_{i+1}"
             ymax['id'] = new_id
             self.ymaxes[new_id] = ymax
             
-        for i, label in enumerate(labels_list):
+        for i, label in enumerate(detection_lists['label']):
             new_id = f"label_{i+1}"
             label['id'] = new_id
             self.labels[new_id] = label
@@ -202,12 +230,12 @@ class BarGraphAnalyzer:
             x_group['id'] = new_id
             self.x_groups[new_id] = x_group
             
-        for i, legend in enumerate(legends_list):
+        for i, legend in enumerate(detection_lists['legend']):
             new_id = f"legend_{i+1}"
             legend['id'] = new_id
             self.legends[new_id] = legend
             
-        for i, legend_group in enumerate(legend_groups_list):
+        for i, legend_group in enumerate(detection_lists['legend_group']):
             new_id = f"legend_group_{i+1}"
             legend_group['id'] = new_id
             self.legend_groups[new_id] = legend_group
@@ -233,56 +261,13 @@ class BarGraphAnalyzer:
             raise ValueError("Invalid coordinates: x1 must be < x2 and y1 must be < y2")
             
         # Find which category the box belongs to and update it
-        if box_id in self.bars:
-            self.bars[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.uptails:
-            self.uptails[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.yaxis:
-            self.yaxis[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.xaxis:
-            self.xaxis[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.origins:
-            self.origins[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.ymaxes:
-            self.ymaxes[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.labels:
-            self.labels[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.x_groups:
-            self.x_groups[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.legends:
-            self.legends[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
-        elif box_id in self.legend_groups:
-            self.legend_groups[box_id].update({
-                'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)
-            })
-            return True
+        new_coords = {'x1': float(x1), 'y1': float(y1), 'x2': float(x2), 'y2': float(y2)}
+        
+        # Check all category dictionaries
+        for category_dict in self._category_dicts:
+            if box_id in category_dict:
+                category_dict[box_id].update(new_coords)
+                return True
         
         return False
 
@@ -297,26 +282,9 @@ class BarGraphAnalyzer:
             Dict[str, Any] | None: Box data or None if not found
         """
         # Search in all category dictionaries
-        if box_id in self.bars:
-            return self.bars[box_id]
-        elif box_id in self.uptails:
-            return self.uptails[box_id]
-        elif box_id in self.yaxis:
-            return self.yaxis[box_id]
-        elif box_id in self.xaxis:
-            return self.xaxis[box_id]
-        elif box_id in self.origins:
-            return self.origins[box_id]
-        elif box_id in self.ymaxes:
-            return self.ymaxes[box_id]
-        elif box_id in self.labels:
-            return self.labels[box_id]
-        elif box_id in self.x_groups:
-            return self.x_groups[box_id]
-        elif box_id in self.legends:
-            return self.legends[box_id]
-        elif box_id in self.legend_groups:
-            return self.legend_groups[box_id]
+        for category_dict in self._category_dicts:
+            if box_id in category_dict:
+                return category_dict[box_id]
         
         return None
 
@@ -327,18 +295,10 @@ class BarGraphAnalyzer:
         Returns:
             Dict containing all detection categories with their boxes
         """
-        return {
-            'bars': self.bars,
-            'uptails': self.uptails,
-            'yaxis': self.yaxis,
-            'xaxis': self.xaxis,
-            'origins': self.origins,
-            'ymaxes': self.ymaxes,
-            'labels': self.labels,
-            'x_groups': self.x_groups,
-            'legends': self.legends,
-            'legend_groups': self.legend_groups
-        }
+        # Create a mapping of category names to their dictionaries
+        category_names = ['bars', 'uptails', 'yaxis', 'xaxis', 'origins', 
+                         'ymaxes', 'labels', 'x_groups', 'legends', 'legend_groups']
+        return dict(zip(category_names, self._category_dicts))
 
     def analyze_image(self) -> Dict[str, Any]:
         """
@@ -353,50 +313,7 @@ class BarGraphAnalyzer:
         """
         return self.calculate_heights()
 
-    def filter_detections(self) -> Tuple[
-        Dict[str, Dict[str, float]],
-        Dict[str, Dict[str, float]],
-        Dict[str, float],
-        Dict[str, float],
-        Dict[str, float],
-        Dict[str, float],
-        Dict[str, float] | None,
-        List[Dict[str, float]],
-    ]:
-        """
-        Partition raw detections into semantic groups and validate presence.
 
-        Returns:
-            Tuple of (bars, uptails, yaxis, xaxis, origin, ymax, label, x_groups)
-
-        Raises:
-            ValueError: If required components are missing or ambiguous
-        """
-        if self.detections is None:
-            raise ValueError("No detections available. Call detect_box() first.")
-
-        # Use the already organized detections
-        bars = self.bars
-        uptails = self.uptails
-        
-        # Get the first item from each category (since we need single objects for calculations)
-        yaxis = next(iter(self.yaxis.values())) if self.yaxis else None
-        xaxis = next(iter(self.xaxis.values())) if self.xaxis else None
-        origin = next(iter(self.origins.values())) if self.origins else None
-        ymax = next(iter(self.ymaxes.values())) if self.ymaxes else None
-        label = next(iter(self.labels.values())) if self.labels else None
-        
-        # Convert x_groups to list for backward compatibility
-        x_groups = list(self.x_groups.values())
-
-        if not yaxis or not xaxis:
-            raise ValueError("No y-axis or x-axis detected in the image.")
-        if not ymax or not origin:
-            raise ValueError("No ymaxes or origins detected in the image.")
-        if not bars:
-            raise ValueError("No bars detected in the image.")
-
-        return bars, uptails, yaxis, xaxis, origin, ymax, label, x_groups
 
     def extract_text(self, image, bbox, rotate: bool = False) -> str:
         """
@@ -431,16 +348,15 @@ class BarGraphAnalyzer:
         """
         results: Dict[str, Any] = {}
 
-        try:
-            origin_value = float(self.origin_value)
-            ymax_value = float(self.ymax_value)
-        except ValueError:
-            raise ValueError("Can't convert the orgin and ymax to number")
+        # Convert to numbers (validation handled on frontend)
+        origin_value = float(self.origin_value)
+        ymax_value = float(self.ymax_value)
 
-        # y-axis height in pixels (top - bottom). Detections are dicts.
-        if self.yaxis is None:
+        # y-axis height in pixels (top - bottom). Get the first yaxis detection
+        if not self.yaxis:
             raise ValueError("yaxis not set")
-        yaxis_height = self.yaxis['y1'] - self.yaxis['y2']
+        yaxis_obj = next(iter(self.yaxis.values()))
+        yaxis_height = yaxis_obj['y1'] - yaxis_obj['y2']
         scale_factor = (ymax_value - origin_value) / yaxis_height
 
         bar_heights: List[float] = []

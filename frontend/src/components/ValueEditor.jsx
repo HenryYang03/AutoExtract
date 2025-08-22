@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-const ValueEditor = ({ originValue, ymaxValue, onUpdate, isUpdating = false }) => {
+const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConversionError, onUpdate, isUpdating = false }) => {
     const [editingOrigin, setEditingOrigin] = useState('');
     const [editingYmax, setEditingYmax] = useState('');
     const [validationErrors, setValidationErrors] = useState({});
@@ -148,12 +148,44 @@ const ValueEditor = ({ originValue, ymaxValue, onUpdate, isUpdating = false }) =
                 </div>
             </div>
 
-            {/* Current values display */}
+            {/* Current stored values display */}
             <div className="mt-2 pt-2 border-top">
                 <small className="text-muted">
-                    Current: ymax = {ymaxValue}, origin = {originValue}
+                    <strong>Current stored values:</strong>
                 </small>
+                <div className="row mt-1">
+                    <div className="col-6">
+                        <small className="text-muted">ymax:</small>
+                        <div className="fw-bold text-primary">{ymaxValue || 'Not set'}</div>
+                    </div>
+                    <div className="col-6">
+                        <small className="text-muted">origin:</small>
+                        <div className="fw-bold text-primary">{originValue || 'Not set'}</div>
+                    </div>
+                </div>
             </div>
+
+            {/* Conversion error messages */}
+            {(originConversionError || ymaxConversionError) && (
+                <div className="mt-2 pt-2 border-top">
+                    {originConversionError && (
+                        <div className="alert alert-warning py-2 mb-2">
+                            <small className="text-warning">
+                                <i className="bi bi-exclamation-triangle me-1"></i>
+                                {originConversionError}
+                            </small>
+                        </div>
+                    )}
+                    {ymaxConversionError && (
+                        <div className="alert alert-warning py-2 mb-2">
+                            <small className="text-warning">
+                                <i className="bi bi-exclamation-triangle me-1"></i>
+                                {ymaxConversionError}
+                            </small>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

@@ -110,6 +110,35 @@ export const updateBoxCoordinates = async (boxId, coords) => {
 };
 
 /**
+ * Calculate bar and uptail heights using current detections
+ * 
+ * @returns {Promise<Object>} Height calculation results
+ * @throws {Error} If the calculation fails
+ */
+export const calculateHeights = async () => {
+    try {
+        const response = await fetch('/api/calculate_heights', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to calculate heights');
+        }
+
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            throw new Error('Network error: Unable to reach the backend server');
+        }
+        throw error;
+    }
+};
+
+/**
  * Get the URL for an uploaded image
  * 
  * @param {string} filename - The filename of the uploaded image

@@ -67,7 +67,9 @@ def handle_bar_analyzer() -> Tuple[Dict[str, Any], int]:
             'image_shape': list(analyzer.image.shape[:2]),
             'image_url': f'/static/uploads/{filename}',
             'origin_value': analyzer.origin_value,
-            'ymax_value': analyzer.ymax_value
+            'ymax_value': analyzer.ymax_value,
+            'origin_conversion_error': analyzer.origin_conversion_error,
+            'ymax_conversion_error': analyzer.ymax_conversion_error
         }
         
         return response_data, 200
@@ -132,7 +134,7 @@ def handle_update_box_coordinates() -> Tuple[Dict[str, Any], int]:
     Handle requests to update box coordinates when moved on the frontend.
     
     This endpoint allows updating the coordinates of detection boxes
-    when they are moved or resized on the interactive canvas.
+    after they have been moved or resized on the frontend canvas.
     
     Returns:
         Tuple[Dict[str, Any], int]: JSON response and HTTP status code
@@ -140,10 +142,10 @@ def handle_update_box_coordinates() -> Tuple[Dict[str, Any], int]:
     Example Request:
         {
             "box_id": "bar_1",
-            "x1": 100,
-            "y1": 50,
-            "x2": 200,
-            "y2": 150
+            "x1": 100.0,
+            "y1": 200.0,
+            "x2": 150.0,
+            "y2": 300.0
         }
         
     Example Response:
@@ -154,34 +156,86 @@ def handle_update_box_coordinates() -> Tuple[Dict[str, Any], int]:
     """
     try:
         data = request.get_json()
-        if not data:
-            return {'error': 'No JSON data provided'}, 400
-            
-        box_id = data.get('box_id')
-        x1 = data.get('x1')
-        y1 = data.get('y1')
-        x2 = data.get('x2')
-        y2 = data.get('y2')
         
-        if not all(v is not None for v in [box_id, x1, y1, x2, y2]):
-            return {'error': 'All coordinates (box_id, x1, y1, x2, y2) are required'}, 400
-            
-        # Get analyzer instance and update box coordinates
+        # Validate required fields
+        required_fields = ['box_id', 'x1', 'y1', 'x2', 'y2']
+        for field in required_fields:
+            if field not in data:
+                return {'error': f'Missing required field: {field}'}, 400
+        
+        box_id = data['box_id']
+        x1 = float(data['x1'])
+        y1 = float(data['y1'])
+        x2 = float(data['x2'])
+        y2 = float(data['y2'])
+        
+        # Validate coordinate values
+        if x1 >= x2 or y1 >= y2:
+            return {'error': 'Invalid coordinates: x1 must be < x2 and y1 must be < y2'}, 400
+        
+        # Get analyzer instance and update coordinates
         analyzer = model_manager.get_analyzer()
         success = analyzer.update_box_coordinates(box_id, x1, y1, x2, y2)
         
         if success:
-            return {
-                'success': True,
-                'message': 'Box coordinates updated successfully'
-            }, 200
+            return {'success': True, 'message': 'Box coordinates updated successfully'}, 200
         else:
             return {'error': f'Box with ID {box_id} not found'}, 404
-        
+            
     except ValueError as e:
         return {'error': f'Invalid coordinates: {str(e)}'}, 400
     except Exception as e:
         return {'error': f'Failed to update box coordinates: {str(e)}'}, 500
+
+
+def handle_calculate_heights() -> Tuple[Dict[str, Any], int]:
+    """
+    Handle requests to calculate bar and uptail heights.
+    
+    This endpoint triggers the height calculation using the current
+    detection boxes and returns the computed results.
+    
+    Returns:
+        Tuple[Dict[str, Any], int]: JSON response and HTTP status code
+        
+    Example Response:
+        {
+            "success": true,
+            "results": {
+                "chart_label": {
+                    "bar_heights": [6.5, 8.2],
+                    "uptail_heights": [0.8, 1.2],
+                    "origin_value": 0,
+                    "ymax_value": 25,
+                    "bar_label_texts": ["Group A", "Group B"]
+                }
+            }
+        }
+    """
+    try:
+        # Get analyzer instance
+        analyzer = model_manager.get_analyzer()
+        
+        # Check if image has been processed
+        if analyzer.image is None:
+            return {'error': 'No image has been processed yet. Please upload and analyze an image first.'}, 400
+        
+        # Check if detections exist
+        if not analyzer.detections:
+            return {'error': 'No detections found. Please ensure the image has been analyzed.'}, 400
+        
+        # Calculate heights
+        results = analyzer.calculate_heights()
+        
+        return {
+            'success': True,
+            'results': results
+        }, 200
+        
+    except ValueError as e:
+        return {'error': f'Calculation error: {str(e)}'}, 400
+    except Exception as e:
+        return {'error': f'Failed to calculate heights: {str(e)}'}, 500
 
 
 def handle_uploaded_file(filename: str) -> Any:

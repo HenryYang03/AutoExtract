@@ -12,7 +12,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useCanvasManager } from '../hooks/useCanvasManager';
 
 // Services
-import { uploadImageForAnalysis, updateValues, updateBoxCoordinates } from '../services/apiService';
+import { uploadImageForAnalysis, updateValues, updateBoxCoordinates, calculateHeights } from '../services/apiService';
 
 // Components
 import FileUpload from './FileUpload';
@@ -35,10 +35,16 @@ const BarAnalyzer = () => {
     // Value editing state
     const [originValue, setOriginValue] = useState('');
     const [ymaxValue, setYmaxValue] = useState('');
+    const [originConversionError, setOriginConversionError] = useState('');
+    const [ymaxConversionError, setYmaxConversionError] = useState('');
     const [isUpdatingValues, setIsUpdatingValues] = useState(false);
 
     // Selection state
     const [selectedInfo, setSelectedInfo] = useState(null);
+
+    // Height calculation state
+    const [isCalculatingHeights, setIsCalculatingHeights] = useState(false);
+    const [heightResults, setHeightResults] = useState(null);
 
     /**
      * Handle file selection change
@@ -56,7 +62,10 @@ const BarAnalyzer = () => {
             setImageUrl('');
             setOriginValue('');
             setYmaxValue('');
+            setOriginConversionError('');
+            setYmaxConversionError('');
             setSelectedInfo(null);
+            setHeightResults(null); // Clear height results
         }
     }, []);
 
@@ -78,6 +87,8 @@ const BarAnalyzer = () => {
             setImageUrl(data.image_url || '');
             setOriginValue(data.origin_value || '');
             setYmaxValue(data.ymax_value || '');
+            setOriginConversionError(data.origin_conversion_error || '');
+            setYmaxConversionError(data.ymax_conversion_error || '');
             setSelectedInfo(null);
 
         } catch (err) {
@@ -102,11 +113,40 @@ const BarAnalyzer = () => {
             setOriginValue(data.origin_value);
             setYmaxValue(data.ymax_value);
 
+            // Clear conversion errors since values are now valid
+            setOriginConversionError('');
+            setYmaxConversionError('');
+
         } catch (err) {
             setError(`Failed to update values: ${err.message}`);
             console.error('Value update error:', err);
         } finally {
             setIsUpdatingValues(false);
+        }
+    }, []);
+
+    /**
+     * Handle height calculation request
+     */
+    const handleCalculateHeights = useCallback(async () => {
+        setIsCalculatingHeights(true);
+        setError('');
+
+        try {
+            const data = await calculateHeights();
+
+            if (data.success && data.results) {
+                setHeightResults(data.results);
+                setError(''); // Clear any previous errors
+            } else {
+                throw new Error('Invalid response from height calculation');
+            }
+
+        } catch (err) {
+            setError(`Failed to calculate heights: ${err.message}`);
+            console.error('Height calculation error:', err);
+        } finally {
+            setIsCalculatingHeights(false);
         }
     }, []);
 
@@ -234,9 +274,15 @@ const BarAnalyzer = () => {
                 <FileUpload
                     onUpload={handleUpload}
                     onFileChange={handleFileChange}
+                    onCalculateHeights={handleCalculateHeights}
                     filename={filename}
                     error={error}
                     isUploading={isUploading}
+                    isCalculating={isCalculatingHeights}
+                    heightResults={heightResults}
+                    hasDetections={detectionBoxes.length > 0}
+                    originConversionError={originConversionError}
+                    ymaxConversionError={ymaxConversionError}
                 />
 
                 {/* Right: Canvas viewer section */}
@@ -244,22 +290,25 @@ const BarAnalyzer = () => {
                     canvasContainerRef={canvasManager.canvasContainerRef}
                     onAddBox={handleAddBox}
                     selectedInfo={selectedInfo}
+                    valueEditor={
+                        <ValueEditor
+                            originValue={originValue}
+                            ymaxValue={ymaxValue}
+                            originConversionError={originConversionError}
+                            ymaxConversionError={ymaxConversionError}
+                            onUpdate={handleValueUpdate}
+                            isUpdating={isUpdatingValues}
+                        />
+                    }
+                    selectionInfo={
+                        <SelectionInfo
+                            selectedInfo={selectedInfo}
+                            onDelete={handleDeleteBox}
+                            onAddBox={handleAddBox}
+                            onSyncCoordinates={handleSyncCoordinates}
+                        />
+                    }
                 >
-                    {/* Value editor */}
-                    <ValueEditor
-                        originValue={originValue}
-                        ymaxValue={ymaxValue}
-                        onUpdate={handleValueUpdate}
-                        isUpdating={isUpdatingValues}
-                    />
-
-                    {/* Selection info */}
-                    <SelectionInfo
-                        selectedInfo={selectedInfo}
-                        onDelete={handleDeleteBox}
-                        onAddBox={handleAddBox}
-                        onSyncCoordinates={handleSyncCoordinates}
-                    />
                 </CanvasViewer>
             </div>
         </div>

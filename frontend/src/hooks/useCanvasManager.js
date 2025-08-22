@@ -101,6 +101,9 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
         // Store mapping between fabric object and backend ID
         if (boxId) {
             boxIdMapRef.current.set(rect, boxId);
+            console.log(`Created mapping: ${boxId} -> fabric object`, rect);
+        } else {
+            console.warn(`No boxId provided for label: ${label}`);
         }
 
         canvas.add(rect);
@@ -238,11 +241,11 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
     }, [onSelectionChange]);
 
     /**
-     * Update the coordinates of a specific box
+     * Update the coordinates of a specific box on the canvas
      * @param {string} boxId - Backend box ID
      * @param {Object} coords - New coordinates {x, y, w, h}
      */
-    const updateBoxCoordinates = useCallback((boxId, coords) => {
+    const updateCanvasBoxCoordinates = useCallback((boxId, coords) => {
         const canvas = fabricCanvasRef.current;
         if (!canvas) return;
 
@@ -269,10 +272,20 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      */
     const getBoxCoordinates = useCallback((boxId) => {
         const canvas = fabricCanvasRef.current;
-        if (!canvas) return null;
+        if (!canvas) {
+            console.log(`Canvas is null when looking for box ${boxId}`);
+            return null;
+        }
 
         console.log(`Looking for box with ID: ${boxId}`);
+        console.log(`Current canvas has ${canvas.getObjects().length} objects`);
         console.log(`Current boxIdMap entries:`, Array.from(boxIdMapRef.current.entries()));
+        console.log(`Canvas objects:`, canvas.getObjects().map(obj => ({
+            type: obj.type,
+            left: obj.left,
+            top: obj.top,
+            data: obj.data
+        })));
 
         // Find the fabric object by ID
         for (const [obj, id] of boxIdMapRef.current.entries()) {
@@ -323,7 +336,7 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
         deleteSelected,
         getOriginalCoordinates,
         scaleRef,
-        updateBoxCoordinates,
+        updateCanvasBoxCoordinates,
         getBoxCoordinates,
         boxIdMapRef,
         setupSelectionHandler

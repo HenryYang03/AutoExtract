@@ -7,8 +7,21 @@
 
 import React, { useState } from 'react';
 import { validateFile } from '../services/apiService';
+import HeightCalculator from './HeightCalculator';
 
-const FileUpload = ({ onUpload, onFileChange, filename, error, isUploading }) => {
+const FileUpload = ({
+    onUpload,
+    onFileChange,
+    onCalculateHeights,
+    filename,
+    error,
+    isUploading,
+    isCalculating,
+    heightResults,
+    hasDetections,
+    originConversionError,
+    ymaxConversionError
+}) => {
     const [dragActive, setDragActive] = useState(false);
 
     /**
@@ -152,6 +165,16 @@ const FileUpload = ({ onUpload, onFileChange, filename, error, isUploading }) =>
                     </button>
                 </div>
             )}
+
+            {/* Height Calculator Section */}
+            <HeightCalculator
+                onCalculate={onCalculateHeights}
+                isCalculating={isCalculating}
+                results={heightResults}
+                hasDetections={hasDetections}
+                originConversionError={originConversionError}
+                ymaxConversionError={ymaxConversionError}
+            />
         </div>
     );
 };

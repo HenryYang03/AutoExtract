@@ -11,7 +11,9 @@ const CanvasViewer = ({
     canvasContainerRef,
     onAddBox,
     selectedInfo,
-    children
+    children,
+    valueEditor,
+    selectionInfo
 }) => {
     return (
         <div className="col-lg-8 col-md-7 ps-lg-4 border-start">
@@ -22,6 +24,43 @@ const CanvasViewer = ({
                     Interactive Detection Viewer
                 </h5>
             </div>
+
+            {/* Instructions above canvas */}
+            <div className="mb-3">
+                <div className="alert alert-info py-2">
+                    <small className="text-info">
+                        <i className="bi bi-info-circle me-2"></i>
+                        <strong>How to adjust detection boxes:</strong>
+                    </small>
+                    <div className="mt-2">
+                        <small className="text-info">
+                            1. <strong>Click on a detected box</strong> to select it and see its details
+                        </small>
+                        <br />
+                        <small className="text-info">
+                            2. <strong>Drag the box</strong> to move it to the correct position
+                        </small>
+                        <br />
+                        <small className="text-info">
+                            3. <strong>Click "Sync Coordinates"</strong> to save the adjusted position
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            {/* Value Editor above canvas */}
+            {valueEditor && (
+                <div className="mb-3">
+                    {valueEditor}
+                </div>
+            )}
+
+            {/* Selection Info above canvas */}
+            {selectionInfo && (
+                <div className="mb-3">
+                    {selectionInfo}
+                </div>
+            )}
 
             {/* Canvas container */}
             <div className="card">
@@ -37,15 +76,6 @@ const CanvasViewer = ({
                         }}
                     />
                 </div>
-            </div>
-
-            {/* Instructions */}
-            <div className="mt-3">
-                <small className="text-muted">
-                    <i className="bi bi-info-circle me-1"></i>
-                    <strong>Instructions:</strong> Click and drag to select boxes, drag to move/resize,
-                    or use the buttons above to add/delete detection boxes.
-                </small>
             </div>
 
             {/* Render children (ValueEditor, SelectionInfo) */}
