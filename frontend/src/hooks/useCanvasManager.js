@@ -348,8 +348,23 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
     const addNewBox = useCallback((x = 100, y = 50, width = 120, height = 60) => {
         const canvas = fabricCanvasRef.current;
         if (canvas) {
-            createDetectionBox(canvas, x, y, width, height, 'new');
+            // Create a temporary ID for the new box
+            const tempId = `temp_${Date.now()}`;
+
+            // Create the box on canvas
+            createDetectionBox(canvas, x, y, width, height, 'bar', tempId);
+
+            // Return the box data for backend processing
+            const scale = scaleRef.current;
+            return {
+                x1: x / scale,
+                y1: y / scale,
+                x2: (x + width) / scale,
+                y2: (y + height) / scale,
+                label: 'bar'  // Default to 'bar' category
+            };
         }
+        return null;
     }, [createDetectionBox]);
 
     /**
@@ -361,12 +376,24 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
 
         const obj = canvas.getActiveObject();
         if (obj) {
+            // Get the box ID before removing it
+            let boxId = null;
+            for (const [fabricObj, id] of boxIdMapRef.current.entries()) {
+                if (fabricObj === obj) {
+                    boxId = id;
+                    break;
+                }
+            }
+
             // Remove from ID mapping
             boxIdMapRef.current.delete(obj);
             canvas.remove(obj);
             canvas.requestRenderAll();
             if (onSelectionChange) onSelectionChange(null);
+
+            return boxId; // Return the box ID that was deleted
         }
+        return null;
     }, [onSelectionChange]);
 
     /**

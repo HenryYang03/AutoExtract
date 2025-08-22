@@ -224,10 +224,12 @@ class BarGraphAnalyzer:
             'legend_group': []
         }
         
-        for detection in self.detections:
+        for i, detection in enumerate(self.detections):
             label = detection['label']
             if label in detection_lists:
                 detection_lists[label].append(detection)
+                # Store original index for stable identification
+                detection['original_index'] = i
         
         # Sort by x1 coordinate where applicable
         sorted_bars = sorted(detection_lists['bar'], key=lambda bar: bar['x1'])
@@ -444,6 +446,293 @@ class BarGraphAnalyzer:
             self.x_label_texts = bar_names.copy()
             return True
         except Exception:
+            return False
+
+    def change_box_category(self, box_id: str, new_category: str) -> bool:
+        """
+        Change the category of a detection box and reorganize the data structures.
+        
+        Args:
+            box_id: Unique identifier of the box to change
+            new_category: New category for the box
+            
+        Returns:
+            bool: True if the category change was successful
+        """
+        try:
+            # Find the box by original index in the detections list
+            box_data = None
+            old_category = None
+            
+            # Extract the index from the box_id (e.g., "label_1" -> 1, "ymax_2" -> 2)
+            try:
+                # Try to find by the generated ID first (for backward compatibility)
+                for category_dict in self._category_dicts:
+                    if box_id in category_dict:
+                        box_data = category_dict[box_id]
+                        # Determine which category this was
+                        if category_dict is self.bars:
+                            old_category = 'bar'
+                        elif category_dict is self.uptails:
+                            old_category = 'uptail'
+                        elif category_dict is self.yaxis:
+                            old_category = 'yaxis'
+                        elif category_dict is self.xaxis:
+                            old_category = 'xaxis'
+                        elif category_dict is self.origins:
+                            old_category = 'origin'
+                        elif category_dict is self.ymaxes:
+                            old_category = 'ymax'
+                        elif category_dict is self.labels:
+                            old_category = 'label'
+                        elif category_dict is self.x_groups:
+                            old_category = 'x_group'
+                        elif category_dict is self.legends:
+                            old_category = 'legend'
+                        elif category_dict is self.legend_groups:
+                            old_category = 'legend_group'
+                        break
+                
+                # If not found by ID, try to find by original index
+                if not box_data:
+                    # Parse the ID to get the index (e.g., "label_1" -> 1)
+                    if '_' in box_id:
+                        category_name, index_str = box_id.rsplit('_', 1)
+                        try:
+                            index = int(index_str) - 1  # Convert to 0-based index
+                            # Find the box in the original detections list
+                            for detection in self.detections:
+                                if detection.get('original_index') == index:
+                                    box_data = detection
+                                    old_category = detection.get('label', 'unknown')
+                                    break
+                        except ValueError:
+                            pass
+            except Exception as e:
+                print(f"Error parsing box_id {box_id}: {e}")
+                return False
+            
+            if not box_data:
+                print(f"Box with ID {box_id} not found in any category")
+                print(f"Available categories and counts:")
+                print(f"  bars: {len(self.bars)}")
+                print(f"  uptails: {len(self.uptails)}")
+                print(f"  yaxis: {len(self.yaxis)}")
+                print(f"  xaxis: {len(self.xaxis)}")
+                print(f"  origins: {len(self.origins)}")
+                print(f"  ymaxes: {len(self.ymaxes)}")
+                print(f"  labels: {len(self.labels)}")
+                print(f"  x_groups: {len(self.x_groups)}")
+                print(f"  legends: {len(self.legends)}")
+                print(f"  legend_groups: {len(self.legend_groups)}")
+                return False
+            
+            # Remove from old category
+            if old_category == 'bar':
+                del self.bars[box_id]
+            elif old_category == 'uptail':
+                del self.uptails[box_id]
+            elif old_category == 'yaxis':
+                del self.yaxis[box_id]
+            elif old_category == 'xaxis':
+                del self.xaxis[box_id]
+            elif old_category == 'origin':
+                del self.origins[box_id]
+            elif old_category == 'ymax':
+                del self.ymaxes[box_id]
+            elif old_category == 'label':
+                del self.labels[box_id]
+            elif old_category == 'x_group':
+                del self.x_groups[box_id]
+            elif old_category == 'legend':
+                del self.legends[box_id]
+            elif old_category == 'legend_group':
+                del self.legend_groups[box_id]
+            
+            # Update the box's label
+            box_data['label'] = new_category
+            
+            # Add to new category but keep the original ID for consistency
+            if new_category == 'bar':
+                self.bars[box_id] = box_data
+            elif new_category == 'uptail':
+                self.uptails[box_id] = box_data
+            elif new_category == 'yaxis':
+                self.yaxis[box_id] = box_data
+            elif new_category == 'xaxis':
+                self.xaxis[box_id] = box_data
+            elif new_category == 'origin':
+                self.origins[box_id] = box_data
+            elif new_category == 'ymax':
+                self.ymaxes[box_id] = box_data
+            elif new_category == 'label':
+                self.labels[box_id] = box_data
+            elif new_category == 'x_group':
+                self.x_groups[box_id] = box_data
+            elif new_category == 'legend':
+                self.legends[box_id] = box_data
+            elif new_category == 'legend_group':
+                self.legend_groups[box_id] = box_data
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error changing box category: {e}")
+            return False
+
+    def add_new_box(self, box_data: Dict[str, Any]) -> str:
+        """
+        Add a new detection box to the appropriate category.
+        
+        Args:
+            box_data: Dictionary containing box information
+                - x1, y1, x2, y2: coordinates
+                - label: category label
+                - conf: confidence (optional)
+                - class: class index (optional)
+            
+        Returns:
+            str: The ID assigned to the new box
+        """
+        try:
+            # Validate required fields
+            required_fields = ['x1', 'y1', 'x2', 'y2', 'label']
+            for field in required_fields:
+                if field not in box_data:
+                    print(f"Missing required field: {field}")
+                    return None
+            
+            # Create a copy of the box data
+            new_box = box_data.copy()
+            
+            # Generate a unique ID for the new box
+            label = new_box['label']
+            if label == 'bar':
+                new_id = f"bar_{len(self.bars) + 1}"
+                self.bars[new_id] = new_box
+            elif label == 'uptail':
+                new_id = f"uptail_{len(self.uptails) + 1}"
+                self.uptails[new_id] = new_box
+            elif label == 'yaxis':
+                new_id = f"yaxis_{len(self.yaxis) + 1}"
+                self.yaxis[new_id] = new_box
+            elif label == 'xaxis':
+                new_id = f"xaxis_{len(self.xaxis) + 1}"
+                self.xaxis[new_id] = new_box
+            elif label == 'origin':
+                new_id = f"origin_{len(self.origins) + 1}"
+                self.origins[new_id] = new_box
+            elif label == 'ymax':
+                new_id = f"ymax_{len(self.ymaxes) + 1}"
+                self.ymaxes[new_id] = new_box
+            elif label == 'label':
+                new_id = f"label_{len(self.labels) + 1}"
+                self.labels[new_id] = new_box
+            elif label == 'x_group':
+                new_id = f"x_group_{len(self.x_groups) + 1}"
+                self.x_groups[new_id] = new_box
+            elif label == 'legend':
+                new_id = f"legend_{len(self.legends) + 1}"
+                self.legends[new_id] = new_box
+            elif label == 'legend_group':
+                new_id = f"legend_group_{len(self.legend_groups) + 1}"
+                self.legend_groups[new_id] = new_box
+            else:
+                print(f"Unknown label: {label}")
+                return None
+            
+            # Set the ID in the box data
+            new_box['id'] = new_id
+            
+            # Add to detections list for consistency
+            if self.detections is None:
+                self.detections = []
+            self.detections.append(new_box)
+            
+            print(f"Added new box with ID: {new_id} to category: {label}")
+            return new_id
+            
+        except Exception as e:
+            print(f"Error adding new box: {e}")
+            return None
+
+    def remove_box(self, box_id: str) -> bool:
+        """
+        Remove a detection box from the data structures.
+        
+        Args:
+            box_id: Unique identifier of the box to remove
+            
+        Returns:
+            bool: True if the box was successfully removed
+        """
+        try:
+            # Find the box in any of the category dictionaries
+            box_data = None
+            old_category = None
+            
+            # Check all category dictionaries to find the box
+            for category_dict in self._category_dicts:
+                if box_id in category_dict:
+                    box_data = category_dict[box_id]
+                    # Determine which category this was
+                    if category_dict is self.bars:
+                        old_category = 'bar'
+                    elif category_dict is self.uptails:
+                        old_category = 'uptail'
+                    elif category_dict is self.yaxis:
+                        old_category = 'yaxis'
+                    elif category_dict is self.xaxis:
+                        old_category = 'xaxis'
+                    elif category_dict is self.origins:
+                        old_category = 'origin'
+                    elif category_dict is self.ymaxes:
+                        old_category = 'ymax'
+                    elif category_dict is self.labels:
+                        old_category = 'label'
+                    elif category_dict is self.x_groups:
+                        old_category = 'x_group'
+                    elif category_dict is self.legends:
+                        old_category = 'legend'
+                    elif category_dict is self.legend_groups:
+                        old_category = 'legend_group'
+                    break
+            
+            if not box_data:
+                print(f"Box with ID {box_id} not found for removal")
+                return False
+            
+            # Remove from the appropriate category dictionary
+            if old_category == 'bar':
+                del self.bars[box_id]
+            elif old_category == 'uptail':
+                del self.uptails[box_id]
+            elif old_category == 'yaxis':
+                del self.yaxis[box_id]
+            elif old_category == 'xaxis':
+                del self.xaxis[box_id]
+            elif old_category == 'origin':
+                del self.origins[box_id]
+            elif old_category == 'ymax':
+                del self.ymaxes[box_id]
+            elif old_category == 'label':
+                del self.labels[box_id]
+            elif old_category == 'x_group':
+                del self.x_groups[box_id]
+            elif old_category == 'legend':
+                del self.legends[box_id]
+            elif old_category == 'legend_group':
+                del self.legend_groups[box_id]
+            
+            # Remove from detections list if it exists
+            if self.detections:
+                self.detections = [det for det in self.detections if det.get('id') != box_id]
+            
+            print(f"Successfully removed box {box_id} from category {old_category}")
+            return True
+            
+        except Exception as e:
+            print(f"Error removing box {box_id}: {e}")
             return False
 
 

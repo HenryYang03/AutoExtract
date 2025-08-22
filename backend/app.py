@@ -19,7 +19,7 @@ import os
 
 from config import UPLOAD_DIR, SECRET_KEY, HOST, PORT, DEBUG
 from model_manager import model_manager
-from routes import handle_bar_analyzer, handle_update_values, handle_update_box_coordinates, handle_uploaded_file, handle_calculate_heights, handle_update_bar_names
+from routes import handle_bar_analyzer, handle_update_values, handle_update_box_coordinates, handle_uploaded_file, handle_calculate_heights, handle_update_bar_names, handle_update_box_category, handle_add_new_box, handle_remove_box
 
 
 def create_app() -> Flask:
@@ -100,6 +100,27 @@ def register_routes(app: Flask) -> None:
         '/api/update_bar_names',
         'update_bar_names',
         handle_update_bar_names,
+        methods=['POST']
+    )
+    
+    app.add_url_rule(
+        '/api/update_box_category',
+        'update_box_category',
+        handle_update_box_category,
+        methods=['POST']
+    )
+    
+    app.add_url_rule(
+        '/api/add_new_box',
+        'add_new_box',
+        handle_add_new_box,
+        methods=['POST']
+    )
+    
+    app.add_url_rule(
+        '/api/remove_box',
+        'remove_box',
+        handle_remove_box,
         methods=['POST']
     )
     

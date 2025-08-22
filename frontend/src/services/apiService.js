@@ -208,4 +208,100 @@ export const updateBarNames = async (barNames) => {
         }
         throw error;
     }
+};
+
+/**
+ * Update the category of a detection box
+ * 
+ * @param {string} boxId - Unique identifier of the box
+ * @param {string} newCategory - New category for the box
+ * @returns {Promise<Object>} Response from the backend
+ * @throws {Error} If the update fails
+ */
+export const updateBoxCategory = async (boxId, newCategory) => {
+    try {
+        const response = await fetch('/api/update_box_category', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                box_id: boxId,
+                new_category: newCategory
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update box category');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error updating box category:', error);
+        throw error;
+    }
+};
+
+/**
+ * Add a new detection box to the backend
+ * 
+ * @param {Object} boxData - Box data with coordinates and label
+ * @param {number} boxData.x1 - Left coordinate
+ * @param {number} boxData.y1 - Top coordinate
+ * @param {number} boxData.x2 - Right coordinate
+ * @param {number} boxData.y2 - Bottom coordinate
+ * @param {string} boxData.label - Category label
+ * @returns {Promise<Object>} Response from the backend
+ * @throws {Error} If the operation fails
+ */
+export const addNewBox = async (boxData) => {
+    try {
+        const response = await fetch('/api/add_new_box', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(boxData),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to add new box');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error adding new box:', error);
+        throw error;
+    }
+};
+
+/**
+ * Remove a detection box from the backend
+ * 
+ * @param {string} boxId - Unique identifier of the box to remove
+ * @returns {Promise<Object>} Response from the backend
+ * @throws {Error} If the operation fails
+ */
+export const removeBox = async (boxId) => {
+    try {
+        const response = await fetch('/api/remove_box', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ box_id: boxId }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to remove box');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error removing box:', error);
+        throw error;
+    }
 }; 

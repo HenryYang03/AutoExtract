@@ -12,7 +12,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useCanvasManager } from '../hooks/useCanvasManager';
 
 // Services
-import { uploadImageForAnalysis, updateValues, updateBoxCoordinates, calculateHeights } from '../services/apiService';
+import { uploadImageForAnalysis, updateValues, updateBoxCoordinates, calculateHeights, updateBoxCategory, addNewBox, removeBox } from '../services/apiService';
 
 // Components
 import FileUpload from './FileUpload';
@@ -239,15 +239,36 @@ const BarAnalyzer = () => {
     }, [canvasManager, handleSelectionChange]);
 
     /**
-     * Manually sync coordinates for the currently selected box
+     * Manually sync coordinates and category changes for the currently selected box
      */
     const handleSyncCoordinates = useCallback(async () => {
         if (!selectedInfo || !selectedInfo.boxId) {
-            setError('No box selected for coordinate sync');
+            setError('No box selected for sync');
             return;
         }
 
         try {
+            // Check if category has changed
+            const originalBox = detectionBoxes.find(box => box.id === selectedInfo.boxId);
+            const categoryChanged = originalBox && originalBox.label !== selectedInfo.label;
+
+            // If category changed, apply it first
+            if (categoryChanged) {
+                console.log(`Attempting to change category for box ${selectedInfo.boxId} from ${originalBox.label} to ${selectedInfo.label}`);
+                const result = await updateBoxCategory(selectedInfo.boxId, selectedInfo.label);
+
+                // Update detection boxes with the new data from backend
+                if (result.detection_boxes) {
+                    setDetectionBoxes(result.detection_boxes);
+                    console.log('Updated detection boxes:', result.detection_boxes);
+                }
+
+                // Update component status if provided
+                if (result.component_status) {
+                    setComponentStatus(result.component_status);
+                }
+            }
+
             // Get current coordinates from the canvas using the box ID
             const currentCoords = canvasManager.getBoxCoordinates(selectedInfo.boxId);
             if (!currentCoords) {
@@ -266,30 +287,132 @@ const BarAnalyzer = () => {
 
             setError(''); // Clear any previous errors
         } catch (error) {
-            setError(`Failed to sync coordinates: ${error.message}`);
-            console.error('Coordinate sync error:', error);
+            setError(`Failed to sync: ${error.message}`);
+            console.error('Sync error:', error);
         }
-    }, [selectedInfo, canvasManager]);
+    }, [selectedInfo, canvasManager, detectionBoxes]);
 
     /**
      * Handle adding a new box
      */
-    const handleAddBox = useCallback(() => {
-        canvasManager.addNewBox();
-    }, []);
+    const handleAddBox = useCallback(async () => {
+        try {
+            // Get the new box from canvas manager
+            const newBoxData = canvasManager.addNewBox();
+
+            if (newBoxData) {
+                // Send the new box to the backend
+                const result = await addNewBox(newBoxData);
+
+                // Update detection boxes with the new data from backend
+                if (result.detection_boxes) {
+                    setDetectionBoxes(result.detection_boxes);
+                    console.log('Updated detection boxes after adding new box:', result.detection_boxes);
+                }
+
+                // Update component status if provided
+                if (result.component_status) {
+                    setComponentStatus(result.component_status);
+                }
+
+                setError(''); // Clear any previous errors
+            }
+        } catch (error) {
+            setError(`Failed to add new box: ${error.message}`);
+            console.error('Add box error:', error);
+        }
+    }, [canvasManager]);
 
     /**
      * Handle deleting the selected box
      */
-    const handleDeleteBox = useCallback(() => {
-        canvasManager.deleteSelected();
+    const handleDeleteBox = useCallback(async () => {
+        if (!selectedInfo || !selectedInfo.boxId) {
+            setError('No box selected for deletion');
+            return;
+        }
+
+        try {
+            // Remove the box from the backend
+            const result = await removeBox(selectedInfo.boxId);
+
+            // Update detection boxes with the new data from backend
+            if (result.detection_boxes) {
+                setDetectionBoxes(result.detection_boxes);
+                console.log('Updated detection boxes after removing box:', result.detection_boxes);
+            }
+
+            // Update component status if provided
+            if (result.component_status) {
+                setComponentStatus(result.component_status);
+            }
+
+            // Remove the box from the canvas and get the deleted box ID
+            const deletedBoxId = canvasManager.deleteSelected();
+
+            // Verify the deleted box ID matches the selected box ID
+            if (deletedBoxId !== selectedInfo.boxId) {
+                console.warn(`Box ID mismatch: deleted ${deletedBoxId}, expected ${selectedInfo.boxId}`);
+            }
+
+            // Clear selection
+            setSelectedInfo(null);
+
+            setError(''); // Clear any previous errors
+        } catch (error) {
+            setError(`Failed to remove box: ${error.message}`);
+            console.error('Remove box error:', error);
+        }
+    }, [selectedInfo, canvasManager]);
+
+    /**
+     * Handle changing the category of a box (local display only)
+     */
+    const handleCategoryChange = useCallback(async (boxId, newCategory, applyImmediately = false) => {
+        if (!boxId || !newCategory) {
+            setError('Invalid box ID or category');
+            return;
+        }
+
+        if (applyImmediately) {
+            try {
+                // Update category on the backend
+                const result = await updateBoxCategory(boxId, newCategory);
+
+                // Update local selection info
+                setSelectedInfo(prev => ({
+                    ...prev,
+                    label: newCategory
+                }));
+
+                // Update detection boxes with the new data from backend
+                if (result.detection_boxes) {
+                    setDetectionBoxes(result.detection_boxes);
+                }
+
+                // Update component status if provided
+                if (result.component_status) {
+                    setComponentStatus(result.component_status);
+                }
+
+                setError(''); // Clear any previous errors
+            } catch (error) {
+                setError(`Failed to change category: ${error.message}`);
+                console.error('Category change error:', error);
+            }
+        } else {
+            // Just update local display without applying to backend
+            setSelectedInfo(prev => ({
+                ...prev,
+                label: newCategory
+            }));
+        }
     }, []);
 
-    // useEffect(() => { // This useEffect is no longer needed
-    //     return () => {
-    //         // No debounce timeout to clear
-    //     };
-    // }, []);
+    // Debug: Log when detection boxes change
+    useEffect(() => {
+        console.log('Detection boxes updated:', detectionBoxes);
+    }, [detectionBoxes]);
 
     return (
         <div className="container-fluid">
@@ -330,8 +453,8 @@ const BarAnalyzer = () => {
                         <SelectionInfo
                             selectedInfo={selectedInfo}
                             onDelete={handleDeleteBox}
-                            onAddBox={handleAddBox}
                             onSyncCoordinates={handleSyncCoordinates}
+                            onCategoryChange={handleCategoryChange}
                         />
                     }
                 >

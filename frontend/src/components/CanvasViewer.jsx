@@ -23,6 +23,15 @@ const CanvasViewer = ({
                     <i className="bi bi-eye me-2"></i>
                     Interactive Detection Viewer
                 </h5>
+                <button
+                    type="button"
+                    className="btn btn-success btn-sm"
+                    onClick={onAddBox}
+                    title="Add a new detection box"
+                >
+                    <i className="bi bi-plus-circle me-1"></i>
+                    Add Box
+                </button>
             </div>
 
             {/* Instructions above canvas */}
@@ -42,7 +51,11 @@ const CanvasViewer = ({
                         </small>
                         <br />
                         <small className="text-info">
-                            3. <strong>Click "Sync Coordinates"</strong> to save the adjusted position
+                            3. <strong>Change category</strong> using the dropdown if needed
+                        </small>
+                        <br />
+                        <small className="text-info">
+                            4. <strong>Click "Sync"</strong> to save position and category changes
                         </small>
                     </div>
                 </div>

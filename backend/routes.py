@@ -290,6 +290,229 @@ def handle_update_bar_names() -> Tuple[Dict[str, Any], int]:
         return {'error': f'Failed to update bar names: {str(e)}'}, 500
 
 
+def handle_update_box_category() -> Tuple[Dict[str, Any], int]:
+    """
+    Handle requests to update the category of a detection box.
+    
+    This endpoint allows changing the category of a detected box
+    and reorganizing the data structures accordingly.
+    
+    Returns:
+        Tuple[Dict[str, Any], int]: JSON response and HTTP status code
+        
+    Example Request:
+        {
+            "box_id": "bar_1",
+            "new_category": "uptail"
+        }
+        
+    Example Response:
+        {
+            "success": true,
+            "message": "Box category updated successfully",
+            "new_category": "uptail"
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return {'error': 'No JSON data provided'}, 400
+            
+        box_id = data.get('box_id')
+        new_category = data.get('new_category')
+        
+        if not box_id or not new_category:
+            return {'error': 'Both box_id and new_category are required'}, 400
+            
+        # Validate category
+        valid_categories = ['bar', 'uptail', 'yaxis', 'xaxis', 'ymax', 'origin', 'label', 'x_group', 'legend', 'legend_group']
+        if new_category not in valid_categories:
+            return {'error': f'Invalid category. Must be one of: {", ".join(valid_categories)}'}, 400
+            
+        # Get analyzer instance and update box category
+        analyzer = model_manager.get_analyzer()
+        print(f"DEBUG: Attempting to change box {box_id} to category {new_category}")
+        print(f"DEBUG: Available detections: {len(analyzer.detections) if analyzer.detections else 0}")
+        success = analyzer.change_box_category(box_id, new_category)
+        
+        if success:
+            # Get updated component status
+            component_status = analyzer.get_component_status()
+            
+            # Get updated detection boxes
+            updated_detections = []
+            for category_dict in analyzer._category_dicts:
+                updated_detections.extend(category_dict.values())
+            
+            print(f"DEBUG: Returning {len(updated_detections)} updated detection boxes")
+            for det in updated_detections[:3]:  # Log first 3 for debugging
+                print(f"DEBUG: Box {det.get('id', 'no_id')} -> {det.get('label', 'no_label')}")
+            
+            return {
+                'success': True,
+                'message': 'Box category updated successfully',
+                'new_category': new_category,
+                'component_status': component_status,
+                'detection_boxes': updated_detections
+            }, 200
+        else:
+            return {'error': 'Failed to update box category. Box not found or invalid operation.'}, 400
+        
+    except Exception as e:
+        return {'error': f'Failed to update box category: {str(e)}'}, 500
+
+
+def handle_add_new_box() -> Tuple[Dict[str, Any], int]:
+    """
+    Handle requests to add a new detection box.
+    
+    This endpoint allows adding a new box to the backend
+    data structures for height calculation.
+    
+    Returns:
+        Tuple[Dict[str, Any], int]: JSON response and HTTP status code
+        
+    Example Request:
+        {
+            "x1": 100,
+            "y1": 200,
+            "x2": 220,
+            "y2": 300,
+            "label": "bar"
+        }
+        
+    Example Response:
+        {
+            "success": true,
+            "message": "New box added successfully",
+            "box_id": "bar_3",
+            "detection_boxes": [...]
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return {'error': 'No JSON data provided'}, 400
+            
+        # Extract box data
+        x1 = data.get('x1')
+        y1 = data.get('y1')
+        x2 = data.get('x2')
+        y2 = data.get('y2')
+        label = data.get('label')
+        
+        if any(v is None for v in [x1, y1, x2, y2, label]):
+            return {'error': 'All coordinates (x1, y1, x2, y2) and label are required'}, 400
+            
+        # Validate coordinates
+        if x1 >= x2 or y1 >= y2:
+            return {'error': 'Invalid coordinates: x1 must be < x2 and y1 must be < y2'}, 400
+            
+        # Validate label
+        valid_categories = ['bar', 'uptail', 'yaxis', 'xaxis', 'ymax', 'origin', 'label', 'x_group', 'legend', 'legend_group']
+        if label not in valid_categories:
+            return {'error': f'Invalid label. Must be one of: {", ".join(valid_categories)}'}, 400
+            
+        # Get analyzer instance and add new box
+        analyzer = model_manager.get_analyzer()
+        print(f"DEBUG: Adding new box with label {label} at coordinates ({x1}, {y1}, {x2}, {y2})")
+        
+        box_data = {
+            'x1': float(x1),
+            'y1': float(y1),
+            'x2': float(x2),
+            'y2': float(y2),
+            'label': label,
+            'conf': 1.0,  # Default confidence for manually added boxes
+            'class': 0     # Default class index
+        }
+        
+        new_box_id = analyzer.add_new_box(box_data)
+        
+        if new_box_id:
+            # Get updated detection boxes and component status
+            updated_detections = []
+            for category_dict in analyzer._category_dicts:
+                updated_detections.extend(category_dict.values())
+            
+            component_status = analyzer.get_component_status()
+            
+            print(f"DEBUG: Successfully added box {new_box_id}, returning {len(updated_detections)} total boxes")
+            
+            return {
+                'success': True,
+                'message': 'New box added successfully',
+                'box_id': new_box_id,
+                'detection_boxes': updated_detections,
+                'component_status': component_status
+            }, 200
+        else:
+            return {'error': 'Failed to add new box'}, 400
+        
+    except Exception as e:
+        return {'error': f'Failed to add new box: {str(e)}'}, 500
+
+
+def handle_remove_box() -> Tuple[Dict[str, Any], int]:
+    """
+    Handle requests to remove a detection box.
+    
+    This endpoint allows removing a box from the backend
+    data structures.
+    
+    Returns:
+        Tuple[Dict[str, Any], int]: JSON response and HTTP status code
+        
+    Example Request:
+        {
+            "box_id": "bar_3"
+        }
+        
+    Example Response:
+        {
+            "success": true,
+            "message": "Box removed successfully",
+            "detection_boxes": [...]
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return {'error': 'No JSON data provided'}, 400
+            
+        box_id = data.get('box_id')
+        if not box_id:
+            return {'error': 'box_id is required'}, 400
+            
+        # Get analyzer instance and remove the box
+        analyzer = model_manager.get_analyzer()
+        print(f"DEBUG: Attempting to remove box {box_id}")
+        
+        success = analyzer.remove_box(box_id)
+        
+        if success:
+            # Get updated detection boxes and component status
+            updated_detections = []
+            for category_dict in analyzer._category_dicts:
+                updated_detections.extend(category_dict.values())
+            
+            component_status = analyzer.get_component_status()
+            
+            print(f"DEBUG: Successfully removed box {box_id}, returning {len(updated_detections)} total boxes")
+            
+            return {
+                'success': True,
+                'message': 'Box removed successfully',
+                'detection_boxes': updated_detections,
+                'component_status': component_status
+            }, 200
+        else:
+            return {'error': 'Failed to remove box. Box not found.'}, 400
+        
+    except Exception as e:
+        return {'error': f'Failed to remove box: {str(e)}'}, 500
+
+
 def handle_uploaded_file(filename: str) -> Any:
     """
     Serve uploaded files from the uploads directory.

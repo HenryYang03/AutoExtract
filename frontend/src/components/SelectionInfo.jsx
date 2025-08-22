@@ -7,7 +7,7 @@
 
 import React from 'react';
 
-const SelectionInfo = ({ selectedInfo, onDelete, onAddBox, onSyncCoordinates }) => {
+const SelectionInfo = ({ selectedInfo, onDelete, onSyncCoordinates, onCategoryChange }) => {
     if (!selectedInfo) {
         return null;
     }
@@ -22,7 +22,33 @@ const SelectionInfo = ({ selectedInfo, onDelete, onAddBox, onSyncCoordinates }) 
                         <div className="d-flex align-items-center gap-3">
                             <div>
                                 <strong>Category:</strong>
-                                <span className="badge bg-primary ms-2">{label}</span>
+                                <div className="d-flex align-items-center gap-2">
+                                    <select
+                                        className="form-select form-select-sm"
+                                        style={{ width: 'auto' }}
+                                        value={label}
+                                        onChange={(e) => {
+                                            // Store the new category but don't apply it yet
+                                            const newCategory = e.target.value;
+                                            if (newCategory !== label) {
+                                                // Update local selection info for display
+                                                onCategoryChange(selectedInfo.boxId, newCategory, false); // false = don't apply yet
+                                            }
+                                        }}
+                                    >
+                                        <option value="bar">Bar</option>
+                                        <option value="uptail">Uptail</option>
+                                        <option value="yaxis">Y-Axis</option>
+                                        <option value="xaxis">X-Axis</option>
+                                        <option value="ymax">Y-Max</option>
+                                        <option value="origin">Origin</option>
+                                        <option value="label">Label</option>
+                                        <option value="x_group">X-Group</option>
+                                        <option value="legend">Legend</option>
+                                        <option value="legend_group">Legend Group</option>
+                                    </select>
+                                    <small className="text-muted">Select new category, then click Sync</small>
+                                </div>
                             </div>
                             <div>
                                 <strong>Coordinates:</strong>
@@ -38,19 +64,10 @@ const SelectionInfo = ({ selectedInfo, onDelete, onAddBox, onSyncCoordinates }) 
                                 type="button"
                                 className="btn btn-outline-primary"
                                 onClick={onSyncCoordinates}
-                                title="Sync coordinates with backend"
+                                title="Sync coordinates and category changes with backend"
                             >
                                 <i className="bi bi-arrow-clockwise me-1"></i>
-                                Sync Coordinates
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-outline-success"
-                                onClick={onAddBox}
-                                title="Add a new detection box"
-                            >
-                                <i className="bi bi-plus-circle me-1"></i>
-                                Add Box
+                                Sync
                             </button>
                             <button
                                 type="button"
