@@ -5,7 +5,7 @@
  * including bar heights, uptail heights, and chart labels.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { calculateHeights, updateBarNames } from '../services/apiService';
 import { exportToCSV, exportToExcel } from '../utils/exportUtils';
 
@@ -20,6 +20,12 @@ const HeightCalculator = ({
 }) => {
     const [editingBarNames, setEditingBarNames] = useState({});
     const [isUpdatingNames, setIsUpdatingNames] = useState(false);
+
+    // Clear editing state when results change (new image analyzed)
+    useEffect(() => {
+        console.log('Results changed, clearing editing state');
+        setEditingBarNames({});
+    }, [results]);
     /**
      * Handle height calculation button click
      */
@@ -180,7 +186,12 @@ const HeightCalculator = ({
                                         style={{ width: '120px' }}
                                         value={displayName}
                                         onChange={(e) => handleBarNameChange(index, e.target.value)}
-                                        onFocus={() => setEditingBarNames(prev => ({ ...prev, [index]: barName }))}
+                                        onFocus={() => {
+                                            // Only set editing state if we don't already have an edited value
+                                            if (editingBarNames[index] === undefined) {
+                                                setEditingBarNames(prev => ({ ...prev, [index]: barName }));
+                                            }
+                                        }}
                                         placeholder={`Bar ${index + 1}`}
                                     />
                                 </div>
