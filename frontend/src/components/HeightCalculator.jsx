@@ -15,7 +15,8 @@ const HeightCalculator = ({
     results,
     hasDetections,
     originConversionError,
-    ymaxConversionError
+    ymaxConversionError,
+    componentStatus
 }) => {
     const [editingBarNames, setEditingBarNames] = useState({});
     const [isUpdatingNames, setIsUpdatingNames] = useState(false);
@@ -242,11 +243,20 @@ const HeightCalculator = ({
                 </div>
             )}
 
+            {/* Show warning when required components are missing */}
+            {componentStatus && !componentStatus.all_components_ready && componentStatus.missing_components && componentStatus.missing_components.length > 0 && (
+                <div className="alert alert-danger" role="alert">
+                    <i className="bi bi-x-circle me-2"></i>
+                    <strong>Missing required components:</strong> {componentStatus.missing_components.join(', ')}.
+                    Please ensure all required components (yaxis, bars, xaxis, ymax, origin) are detected before calculating heights.
+                </div>
+            )}
+
             <button
                 type="button"
                 className="btn btn-primary w-100 mb-3"
                 onClick={handleCalculateClick}
-                disabled={isCalculating || !hasDetections || originConversionError || ymaxConversionError}
+                disabled={isCalculating || !hasDetections || originConversionError || ymaxConversionError || !componentStatus?.all_components_ready}
             >
                 {isCalculating ? (
                     <>

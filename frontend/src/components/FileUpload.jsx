@@ -20,7 +20,8 @@ const FileUpload = ({
     heightResults,
     hasDetections,
     originConversionError,
-    ymaxConversionError
+    ymaxConversionError,
+    componentStatus
 }) => {
     const [dragActive, setDragActive] = useState(false);
 
@@ -174,6 +175,7 @@ const FileUpload = ({
                 hasDetections={hasDetections}
                 originConversionError={originConversionError}
                 ymaxConversionError={ymaxConversionError}
+                componentStatus={componentStatus}
             />
         </div>
     );

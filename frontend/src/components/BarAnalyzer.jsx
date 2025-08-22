@@ -46,6 +46,13 @@ const BarAnalyzer = () => {
     const [isCalculatingHeights, setIsCalculatingHeights] = useState(false);
     const [heightResults, setHeightResults] = useState(null);
 
+    // Component status state
+    const [componentStatus, setComponentStatus] = useState({
+        present_components: {},
+        missing_components: [],
+        all_components_ready: false
+    });
+
     /**
      * Handle file selection change
      * @param {File|null} newFile - Selected file or null to clear
@@ -66,6 +73,11 @@ const BarAnalyzer = () => {
             setYmaxConversionError('');
             setSelectedInfo(null);
             setHeightResults(null); // Clear height results
+            setComponentStatus({
+                present_components: {},
+                missing_components: [],
+                all_components_ready: false
+            });
         }
     }, []);
 
@@ -91,6 +103,13 @@ const BarAnalyzer = () => {
             setYmaxConversionError(data.ymax_conversion_error || '');
             setSelectedInfo(null);
 
+            // Set component status
+            setComponentStatus(data.component_status || {
+                present_components: {},
+                missing_components: [],
+                all_components_ready: false
+            });
+
         } catch (err) {
             setError(err.message || 'Failed to analyze image');
             console.error('Upload error:', err);
@@ -112,6 +131,11 @@ const BarAnalyzer = () => {
             // Update local state with confirmed values
             setOriginValue(data.origin_value);
             setYmaxValue(data.ymax_value);
+
+            // Update component status if provided
+            if (data.component_status) {
+                setComponentStatus(data.component_status);
+            }
 
             // Clear conversion errors since values are now valid
             setOriginConversionError('');
@@ -283,6 +307,7 @@ const BarAnalyzer = () => {
                     hasDetections={detectionBoxes.length > 0}
                     originConversionError={originConversionError}
                     ymaxConversionError={ymaxConversionError}
+                    componentStatus={componentStatus}
                 />
 
                 {/* Right: Canvas viewer section */}
@@ -298,6 +323,7 @@ const BarAnalyzer = () => {
                             ymaxConversionError={ymaxConversionError}
                             onUpdate={handleValueUpdate}
                             isUpdating={isUpdatingValues}
+                            hasDetections={detectionBoxes.length > 0}
                         />
                     }
                     selectionInfo={

@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConversionError, onUpdate, isUpdating = false }) => {
+const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConversionError, onUpdate, isUpdating = false, hasDetections = false }) => {
     const [editingOrigin, setEditingOrigin] = useState('');
     const [editingYmax, setEditingYmax] = useState('');
     const [validationErrors, setValidationErrors] = useState({});
@@ -76,8 +76,8 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
         }
     };
 
-    // Don't render if no values are available
-    if (!originValue && !ymaxValue) {
+    // Don't render if no detections exist
+    if (!hasDetections) {
         return null;
     }
 
@@ -156,11 +156,19 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
                 <div className="row mt-1">
                     <div className="col-6">
                         <small className="text-muted">ymax:</small>
-                        <div className="fw-bold text-primary">{ymaxValue || 'Not set'}</div>
+                        <div className="fw-bold text-primary">
+                            {ymaxValue ? ymaxValue : (
+                                <span className="text-muted">Not detected - please input manually</span>
+                            )}
+                        </div>
                     </div>
                     <div className="col-6">
                         <small className="text-muted">origin:</small>
-                        <div className="fw-bold text-primary">{originValue || 'Not set'}</div>
+                        <div className="fw-bold text-primary">
+                            {originValue ? originValue : (
+                                <span className="text-muted">Not detected - please input manually</span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

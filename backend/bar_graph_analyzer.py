@@ -111,17 +111,12 @@ class BarGraphAnalyzer:
         label = next(iter(self.labels.values())) if self.labels else None
         x_groups = list(self.x_groups.values())
 
-        # Validate required components
-        if not yaxis or not xaxis:
-            raise ValueError("No y-axis or x-axis detected in the image.")
-        if not ymax or not origin:
-            raise ValueError("No ymaxes or origins detected in the image.")
-        if not self.bars:
-            raise ValueError("No bars detected in the image.")
+        # Component validation now handled separately via get_component_status()
+        # No validation errors raised here - let frontend handle component checking
 
-        # OCR numeric values and validate conversion
-        origin_text = self.extract_numbers(self.image, origin)
-        ymax_text = self.extract_numbers(self.image, ymax)
+        # OCR numeric values and validate conversion (only if components exist)
+        origin_text = self.extract_numbers(self.image, origin) if origin else ''
+        ymax_text = self.extract_numbers(self.image, ymax) if ymax else ''
         
         # Try to convert to numbers and store conversion status
         self.origin_value = origin_text
@@ -130,22 +125,72 @@ class BarGraphAnalyzer:
         self.ymax_conversion_error = None
         
         try:
-            float(origin_text)
+            float(origin_text) if origin_text else None
         except ValueError:
             self.origin_conversion_error = f"Manual input needed for origin value: '{origin_text}'"
             
         try:
-            float(ymax_text)
+            float(ymax_text) if ymax_text else None
         except ValueError:
             self.ymax_conversion_error = f"Manual input needed for ymax value: '{ymax_text}'"
         
-        # OCR x-axis labels and main label
+        # OCR x-axis labels and main label (only if components exist)
         self.x_label_texts = []
-        for x_label in x_groups:
-            self.x_label_texts.append(self.extract_text(self.image, x_label))
+        if x_groups:
+            for x_label in x_groups:
+                self.x_label_texts.append(self.extract_text(self.image, x_label))
 
         if label is not None:
             self.label_text = self.extract_text(self.image, label, rotate=True)
+
+    def get_component_status(self) -> Dict[str, Any]:
+        """
+        Get the status of all required components for height calculation.
+        Considers both physical detection and manual input values.
+        
+        Returns:
+            Dictionary with component status and missing components list.
+        """
+        required_components = {
+            'yaxis': self.yaxis,
+            'xaxis': self.xaxis,
+            'bars': self.bars,
+            'ymax': self.ymaxes,
+            'origin': self.origins
+        }
+        
+        # Check which components are present
+        present_components = {}
+        missing_components = []
+        
+        for component_name, component_dict in required_components.items():
+            if component_dict and len(component_dict) > 0:
+                present_components[component_name] = len(component_dict)
+            else:
+                missing_components.append(component_name)
+        
+        # Special handling for ymax and origin: consider manual input values
+        if 'ymax' in missing_components and self.ymax_value and self.ymax_value.strip():
+            try:
+                float(self.ymax_value)
+                missing_components.remove('ymax')
+                present_components['ymax'] = 'manual_input'
+            except ValueError:
+                pass  # Keep as missing if value can't be converted to float
+                
+        if 'origin' in missing_components and self.origin_value and self.origin_value.strip():
+            try:
+                float(self.origin_value)
+                missing_components.remove('origin')
+                present_components['origin'] = 'manual_input'
+            except ValueError:
+                pass  # Keep as missing if value can't be converted to float
+        
+        return {
+            'present_components': present_components,
+            'missing_components': missing_components,
+            'all_components_ready': len(missing_components) == 0
+        }
 
     def _organize_detections(self) -> None:
         """

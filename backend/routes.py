@@ -60,6 +60,9 @@ def handle_bar_analyzer() -> Tuple[Dict[str, Any], int]:
         if analyzer.image is None:
             return {'error': 'Failed to process image'}, 400
         
+        # Get component status
+        component_status = analyzer.get_component_status()
+        
         # Prepare response
         response_data = {
             'filename': filename,
@@ -69,7 +72,8 @@ def handle_bar_analyzer() -> Tuple[Dict[str, Any], int]:
             'origin_value': analyzer.origin_value,
             'ymax_value': analyzer.ymax_value,
             'origin_conversion_error': analyzer.origin_conversion_error,
-            'ymax_conversion_error': analyzer.ymax_conversion_error
+            'ymax_conversion_error': analyzer.ymax_conversion_error,
+            'component_status': component_status
         }
         
         return response_data, 200
@@ -119,10 +123,14 @@ def handle_update_values() -> Tuple[Dict[str, Any], int]:
         analyzer.origin_value = origin_value
         analyzer.ymax_value = ymax_value
         
+        # Get updated component status after value update
+        component_status = analyzer.get_component_status()
+        
         return {
             'success': True,
             'origin_value': analyzer.origin_value,
-            'ymax_value': analyzer.ymax_value
+            'ymax_value': analyzer.ymax_value,
+            'component_status': component_status
         }, 200
         
     except Exception as e:
