@@ -186,7 +186,20 @@ def handle_update_box_coordinates() -> Tuple[Dict[str, Any], int]:
         success = analyzer.update_box_coordinates(box_id, x1, y1, x2, y2)
         
         if success:
-            return {'success': True, 'message': 'Box coordinates updated successfully'}, 200
+            # Get updated component status after coordinate update
+            component_status = analyzer.get_component_status()
+            
+            # Get updated detection boxes
+            updated_detections = []
+            for category_dict in analyzer._category_dicts:
+                updated_detections.extend(category_dict.values())
+            
+            return {
+                'success': True, 
+                'message': 'Box coordinates updated successfully',
+                'component_status': component_status,
+                'detection_boxes': updated_detections
+            }, 200
         else:
             return {'error': f'Box with ID {box_id} not found'}, 404
             

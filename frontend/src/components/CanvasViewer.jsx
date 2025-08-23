@@ -9,7 +9,6 @@ import React from 'react';
 
 const CanvasViewer = ({
     canvasContainerRef,
-    onAddBox,
     selectedInfo,
     children,
     valueEditor,
@@ -17,21 +16,12 @@ const CanvasViewer = ({
 }) => {
     return (
         <div className="col-lg-8 col-md-7 ps-lg-4 border-start">
-            {/* Header with title and add box button */}
-            <div className="d-flex justify-content-between align-items-center mb-3">
+            {/* Header with title */}
+            <div className="mb-3">
                 <h5 className="mb-0">
                     <i className="bi bi-eye me-2"></i>
                     Interactive Detection Viewer
                 </h5>
-                <button
-                    type="button"
-                    className="btn btn-success btn-sm"
-                    onClick={onAddBox}
-                    title="Add a new detection box"
-                >
-                    <i className="bi bi-plus-circle me-1"></i>
-                    Add Box
-                </button>
             </div>
 
             {/* Instructions above canvas */}

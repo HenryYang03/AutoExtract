@@ -1,99 +1,45 @@
 /**
- * Export utilities for CSV and Excel files
- * Provides functions to export data in long format
+ * Export utilities for CSV and Excel
  */
 
 /**
- * Convert data to CSV format and download
+ * Export data to CSV
  * @param {Array} data - Array of objects to export
- * @param {string} filename - Name of the file (without extension)
+ * @param {string} filename - Filename for the download
  */
-export const exportToCSV = (data, filename) => {
-    if (!data || data.length === 0) {
-        console.warn('No data to export');
-        return;
-    }
+export const exportToCSV = (data, filename = 'export.csv') => {
+    if (!data || data.length === 0) return;
 
-    try {
-        // Get headers from first object
-        const headers = Object.keys(data[0]);
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+        headers.join(','),
+        ...data.map(row => headers.map(header => `"${row[header]}"`).join(','))
+    ].join('\n');
 
-        // Create CSV content
-        const csvContent = [
-            headers.join(','), // Header row
-            ...data.map(row =>
-                headers.map(header => {
-                    const value = row[header];
-                    // Escape commas and quotes in CSV
-                    if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-                        return `"${value.replace(/"/g, '""')}"`;
-                    }
-                    return value;
-                }).join(',')
-            )
-        ].join('\n');
-
-        // Create and download file
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', `${filename}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-    } catch (error) {
-        console.error('Error exporting to CSV:', error);
-        alert('Failed to export CSV file. Please try again.');
-    }
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
 };
 
 /**
- * Convert data to Excel format and download
+ * Export data to Excel
  * @param {Array} data - Array of objects to export
- * @param {string} filename - Name of the file (without extension)
+ * @param {string} filename - Filename for the download
  */
-export const exportToExcel = async (data, filename) => {
-    if (!data || data.length === 0) {
-        console.warn('No data to export');
-        return;
-    }
+export const exportToExcel = async (data, filename = 'export.xlsx') => {
+    if (!data || data.length === 0) return;
 
     try {
-        // Dynamically import xlsx library
         const XLSX = await import('xlsx');
-
-        // Convert data to worksheet format
         const worksheet = XLSX.utils.json_to_sheet(data);
-
-        // Create workbook and add worksheet
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
-
-        // Auto-size columns
-        const maxWidth = Object.keys(data[0]).reduce((max, key) => {
-            const length = Math.max(
-                key.length,
-                ...data.map(row => String(row[key]).length)
-            );
-            return Math.max(max, length);
-        }, 0);
-
-        worksheet['!cols'] = [{ width: maxWidth + 2 }];
-
-        // Generate and download file
-        XLSX.writeFile(workbook, `${filename}.xlsx`);
-
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+        XLSX.writeFile(workbook, filename);
     } catch (error) {
-        console.error('Error exporting to Excel:', error);
-
+        console.error('Excel export failed:', error);
         // Fallback to CSV if Excel export fails
-        console.log('Falling back to CSV export...');
-        exportToCSV(data, filename);
+        exportToCSV(data, filename.replace('.xlsx', '.csv'));
     }
 };

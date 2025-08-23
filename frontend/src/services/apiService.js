@@ -78,23 +78,30 @@ export const updateValues = async ({ origin_value, ymax_value }) => {
 /**
  * Update box coordinates on the backend
  * @param {string} boxId - Unique identifier of the box
- * @param {Object} coords - New coordinates {x, y, w, h}
+ * @param {Object} coords - New coordinates {x1, y1, x2, y2}
  * @returns {Promise<Object>} Response from the backend
  */
 export const updateBoxCoordinates = async (boxId, coords) => {
     try {
+        // Debug logging to verify coordinate format
+        console.log(`Sending coordinates for box ${boxId}:`, coords);
+
+        const requestBody = {
+            box_id: boxId,
+            x1: coords.x1,
+            y1: coords.y1,
+            x2: coords.x2,
+            y2: coords.y2
+        };
+
+        console.log(`Request body for box ${boxId}:`, requestBody);
+
         const response = await fetch('/api/update_box_coordinates', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                box_id: boxId,
-                x1: coords.x,
-                y1: coords.y,
-                x2: coords.x + coords.w,
-                y2: coords.y + coords.h
-            }),
+            body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {

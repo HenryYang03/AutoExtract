@@ -12,7 +12,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useCanvasManager } from '../hooks/useCanvasManager';
 
 // Services
-import { uploadImageForAnalysis, updateValues, updateBoxCoordinates, calculateHeights, updateBoxCategory, addNewBox, removeBox } from '../services/apiService';
+import { uploadImageForAnalysis, updateValues, calculateHeights, updateBoxCategory, removeBox } from '../services/apiService';
+import { syncAllBoxes, validateCoordinatesForSync, prepareCoordinatesForSync } from '../services/syncService';
 
 // Components
 import FileUpload from './FileUpload';
@@ -41,6 +42,9 @@ const BarAnalyzer = () => {
 
     // Selection state
     const [selectedInfo, setSelectedInfo] = useState(null);
+
+    // Track pending category changes separately from movement tracking
+    const [pendingCategoryChanges, setPendingCategoryChanges] = useState(new Map());
 
     // Height calculation state
     const [isCalculatingHeights, setIsCalculatingHeights] = useState(false);
@@ -73,6 +77,7 @@ const BarAnalyzer = () => {
             setYmaxConversionError('');
             setSelectedInfo(null);
             setHeightResults(null); // Clear height results
+            setPendingCategoryChanges(new Map()); // Clear pending category changes
             setComponentStatus({
                 present_components: {},
                 missing_components: [],
@@ -102,6 +107,10 @@ const BarAnalyzer = () => {
             setOriginConversionError(data.origin_conversion_error || '');
             setYmaxConversionError(data.ymax_conversion_error || '');
             setSelectedInfo(null);
+            setPendingCategoryChanges(new Map()); // Clear pending category changes
+
+            // Clear previous calculation results for new image
+            setHeightResults(null);
 
             // Set component status
             setComponentStatus(data.component_status || {
@@ -219,8 +228,12 @@ const BarAnalyzer = () => {
             }
         }
 
+        // Check if there are pending category changes for this box
+        const pendingCategory = pendingCategoryChanges.get(boxId);
+        const displayLabel = pendingCategory || target.data?.label || '';
+
         setSelectedInfo({
-            label: target.data?.label || '',
+            label: displayLabel,
             boxId: boxId,  // Store the actual box ID
             coords: {
                 x: Math.round(left / scale),
@@ -239,83 +252,154 @@ const BarAnalyzer = () => {
     }, [canvasManager, handleSelectionChange]);
 
     /**
-     * Manually sync coordinates and category changes for the currently selected box
+     * Handle syncing all detection boxes to the backend
      */
     const handleSyncCoordinates = useCallback(async () => {
-        if (!selectedInfo || !selectedInfo.boxId) {
-            setError('No box selected for sync');
-            return;
-        }
-
         try {
-            // Check if category has changed
-            const originalBox = detectionBoxes.find(box => box.id === selectedInfo.boxId);
-            const categoryChanged = originalBox && originalBox.label !== selectedInfo.label;
+            setError(''); // Clear any previous errors
 
-            // If category changed, apply it first
-            if (categoryChanged) {
-                console.log(`Attempting to change category for box ${selectedInfo.boxId} from ${originalBox.label} to ${selectedInfo.label}`);
-                const result = await updateBoxCategory(selectedInfo.boxId, selectedInfo.label);
+            // CRITICAL FIX: Collect coordinates BEFORE setting sync flag
+            // This prevents coordinate functions from reading stale canvas data during sync
+            const modifiedCoordinates = canvasManager.getModifiedBoxCoordinates();
+            const allCoordinates = canvasManager.getAllBoxCoordinates();
+            const newBoxCoordinates = allCoordinates.filter(box => box.boxId.startsWith('temp_'));
 
-                // Update detection boxes with the new data from backend
-                if (result.detection_boxes) {
-                    setDetectionBoxes(result.detection_boxes);
-                    console.log('Updated detection boxes:', result.detection_boxes);
-                }
+            // CRITICAL FIX: Filter out new boxes from modified coordinates to prevent duplication
+            // New boxes should only be processed once, not as both new AND modified
+            const filteredModifiedCoordinates = modifiedCoordinates.filter(modifiedBox =>
+                !newBoxCoordinates.some(newBox => newBox.boxId === modifiedBox.boxId)
+            );
 
-                // Update component status if provided
-                if (result.component_status) {
-                    setComponentStatus(result.component_status);
-                }
-            }
+            // Combine filtered modified and new box coordinates
+            const coordinatesToSync = [...filteredModifiedCoordinates, ...newBoxCoordinates];
 
-            // Get current coordinates from the canvas using the box ID
-            const currentCoords = canvasManager.getBoxCoordinates(selectedInfo.boxId);
-            if (!currentCoords) {
-                setError('Could not get current box coordinates');
+            console.log(`Modified coordinates: ${modifiedCoordinates.length}, New coordinates: ${newBoxCoordinates.length}`);
+            console.log(`Filtered modified coordinates: ${filteredModifiedCoordinates.length}`);
+            console.log(`Total coordinates to sync: ${coordinatesToSync.length}`);
+
+            if (coordinatesToSync.length === 0) {
+                console.log('No boxes to sync');
                 return;
             }
 
-            // Update coordinates on the backend using the box ID
-            await updateBoxCoordinates(selectedInfo.boxId, currentCoords.coords);
+            // NOW set sync flag to prevent useCanvasManager effect from running during sync
+            canvasManager.setSyncing(true);
+            console.log('=== SYNC: Started - setSyncing(true) ===');
 
-            // Update local selection info
-            setSelectedInfo(prev => ({
-                ...prev,
-                coords: currentCoords.coords
-            }));
+            // Validate coordinates before sync
+            const validation = validateCoordinatesForSync(coordinatesToSync);
+            if (!validation.valid) {
+                setError(validation.error);
+                canvasManager.setSyncing(false); // Reset sync flag
+                return;
+            }
 
-            setError(''); // Clear any previous errors
+            // Prepare coordinates for sync
+            const preparedCoordinates = prepareCoordinatesForSync(coordinatesToSync);
+
+            // Perform the sync operation
+            const syncResult = await syncAllBoxes(preparedCoordinates, pendingCategoryChanges);
+
+            if (syncResult.success) {
+                console.log('Sync successful:', syncResult.message);
+                setError(''); // Clear any previous errors
+
+                // Clear pending category changes after successful sync
+                setPendingCategoryChanges(new Map());
+
+                // Handle new box IDs if any boxes were registered during sync
+                if (syncResult.newBoxes && syncResult.newBoxes.length > 0) {
+                    console.log('New boxes registered during sync:', syncResult.newBoxes);
+                    // Update canvas manager with new box IDs
+                    canvasManager.updateBoxIds(syncResult.newBoxes);
+                }
+
+                // Update component status if provided (important for yaxis/xaxis detection)
+                if (syncResult.componentStatus) {
+                    console.log('Updating component status after sync:', syncResult.componentStatus);
+                    setComponentStatus(syncResult.componentStatus);
+                } else {
+                    console.warn('No component status received from sync!');
+                }
+
+                // Update detection boxes state with backend data (important for category persistence)
+                if (syncResult.detectionBoxes) {
+                    console.log('=== SYNC: Updating detection boxes state ===');
+                    console.log('Current detectionBoxes count:', detectionBoxes.length);
+                    console.log('New detectionBoxes from backend:', syncResult.detectionBoxes);
+                    console.log('New detectionBoxes count:', syncResult.detectionBoxes.length);
+
+                    // Don't manually clear the canvas - let the useCanvasManager effect handle re-rendering
+                    // This ensures proper cleanup and prevents duplicate boxes
+                    setDetectionBoxes(syncResult.detectionBoxes);
+                    console.log('=== SYNC: setDetectionBoxes called ===');
+                } else {
+                    console.warn('No detection boxes received from sync!');
+                }
+
+                // Clear modification tracking after successful sync
+                canvasManager.clearModifiedTracking();
+
+                // Update coordinates in selection info if a box is selected
+                if (selectedInfo && selectedInfo.boxId) {
+                    const updatedCoords = canvasManager.getBoxCoordinates(selectedInfo.boxId);
+                    if (updatedCoords && updatedCoords.coords) {
+                        setSelectedInfo(prev => ({
+                            ...prev,
+                            coords: updatedCoords.coords
+                        }));
+                    }
+                }
+
+                // Reset sync flag after successful sync
+                canvasManager.setSyncing(false);
+                console.log('=== SYNC: Completed - setSyncing(false) ===');
+            }
         } catch (error) {
-            setError(`Failed to sync: ${error.message}`);
-            console.error('Sync error:', error);
+            console.error('Sync failed:', error);
+            setError(`Sync failed: ${error.message}`);
+
+            // Reset sync flag on error
+            canvasManager.setSyncing(false);
+            console.log('=== SYNC: Failed - setSyncing(false) ===');
         }
-    }, [selectedInfo, canvasManager, detectionBoxes]);
+    }, [canvasManager, pendingCategoryChanges, selectedInfo]);
+
+    /**
+     * Clear pending category changes (useful for canceling unsaved changes)
+     */
+    const clearPendingChanges = useCallback(() => {
+        if (pendingCategoryChanges.size > 0) {
+            console.log(`Clearing ${pendingCategoryChanges.size} pending category changes`);
+            setPendingCategoryChanges(new Map());
+
+            // Reset selectedInfo label to original if it was changed
+            if (selectedInfo && selectedInfo.boxId) {
+                const originalBox = detectionBoxes.find(box => box.id === selectedInfo.boxId);
+                if (originalBox) {
+                    setSelectedInfo(prev => ({
+                        ...prev,
+                        label: originalBox.label
+                    }));
+                }
+            }
+        }
+    }, [pendingCategoryChanges, selectedInfo, detectionBoxes]);
 
     /**
      * Handle adding a new box
      */
     const handleAddBox = useCallback(async () => {
         try {
-            // Get the new box from canvas manager
+            // Get the new box from canvas manager (creates box on canvas with temporary ID)
             const newBoxData = canvasManager.addNewBox();
 
             if (newBoxData) {
-                // Send the new box to the backend
-                const result = await addNewBox(newBoxData);
-
-                // Update detection boxes with the new data from backend
-                if (result.detection_boxes) {
-                    setDetectionBoxes(result.detection_boxes);
-                    console.log('Updated detection boxes after adding new box:', result.detection_boxes);
-                }
-
-                // Update component status if provided
-                if (result.component_status) {
-                    setComponentStatus(result.component_status);
-                }
-
+                console.log('New box added to canvas with temporary ID. Use "Sync" to register with backend.');
                 setError(''); // Clear any previous errors
+
+                // Don't call backend API immediately - let the sync process handle it
+                // This ensures the temporary ID is properly managed during sync
             }
         } catch (error) {
             setError(`Failed to add new box: ${error.message}`);
@@ -336,18 +420,18 @@ const BarAnalyzer = () => {
             // Remove the box from the backend
             const result = await removeBox(selectedInfo.boxId);
 
-            // Update detection boxes with the new data from backend
+            // Update detection boxes state with backend response to prevent duplicates
             if (result.detection_boxes) {
+                console.log('Updating detection boxes after deletion:', result.detection_boxes);
                 setDetectionBoxes(result.detection_boxes);
-                console.log('Updated detection boxes after removing box:', result.detection_boxes);
             }
 
-            // Update component status if provided
+            // Only update component status if provided
             if (result.component_status) {
                 setComponentStatus(result.component_status);
             }
 
-            // Remove the box from the canvas and get the deleted box ID
+            // Remove the box from the canvas
             const deletedBoxId = canvasManager.deleteSelected();
 
             // Verify the deleted box ID matches the selected box ID
@@ -366,46 +450,87 @@ const BarAnalyzer = () => {
     }, [selectedInfo, canvasManager]);
 
     /**
-     * Handle changing the category of a box (local display only)
+     * Handle changing the category of a box
+     * @param {string} boxId - The box ID to change
+     * @param {string} newCategory - The new category
+     * @param {boolean} applyImmediately - Whether to apply immediately or store for later sync
      */
-    const handleCategoryChange = useCallback(async (boxId, newCategory, applyImmediately = false) => {
+    const handleCategoryChange = useCallback((boxId, newCategory, applyImmediately = false) => {
         if (!boxId || !newCategory) {
             setError('Invalid box ID or category');
             return;
         }
 
         if (applyImmediately) {
-            try {
-                // Update category on the backend
-                const result = await updateBoxCategory(boxId, newCategory);
-
-                // Update local selection info
-                setSelectedInfo(prev => ({
-                    ...prev,
-                    label: newCategory
-                }));
-
-                // Update detection boxes with the new data from backend
-                if (result.detection_boxes) {
-                    setDetectionBoxes(result.detection_boxes);
-                }
-
-                // Update component status if provided
-                if (result.component_status) {
-                    setComponentStatus(result.component_status);
-                }
-
-                setError(''); // Clear any previous errors
-            } catch (error) {
-                setError(`Failed to change category: ${error.message}`);
-                console.error('Category change error:', error);
-            }
+            // Apply category change immediately (for immediate sync scenarios)
+            handleCategoryChangeImmediate(boxId, newCategory);
         } else {
-            // Just update local display without applying to backend
+            // Store category change for later sync
+            setPendingCategoryChanges(prev => {
+                const newMap = new Map(prev);
+                newMap.set(boxId, newCategory);
+                console.log(`Stored pending category change for ${boxId}: ${newCategory}`);
+                return newMap;
+            });
+
+            // CRITICAL FIX: Update the canvas object's label immediately
+            // This ensures the correct label is sent during sync
+            if (canvasManager.fabricCanvasRef.current) {
+                const canvas = canvasManager.fabricCanvasRef.current;
+                for (const [obj, id] of canvasManager.boxIdMapRef.current.entries()) {
+                    if (id === boxId) {
+                        if (obj.data) {
+                            obj.data.label = newCategory;
+                            console.log(`Updated canvas object label for ${boxId}: ${newCategory}`);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Mark the box as modified for category change
+            if (boxId.startsWith('temp_')) {
+                // For new boxes, we can't mark as modified yet since they don't have a permanent ID
+                console.log(`Category change for new box ${boxId} will be applied during sync`);
+            } else {
+                // For existing boxes, mark as modified
+                console.log(`Marking existing box ${boxId} as modified due to category change`);
+            }
+
+            // Update local display
             setSelectedInfo(prev => ({
                 ...prev,
                 label: newCategory
             }));
+        }
+    }, [canvasManager]);
+
+    /**
+     * Apply category change immediately to backend
+     */
+    const handleCategoryChangeImmediate = useCallback(async (boxId, newCategory) => {
+        try {
+            const result = await updateBoxCategory(boxId, newCategory);
+
+            // Don't update detection boxes state - keep canvas state intact
+            // This preserves any modified boxes that haven't been synced yet
+
+            // Only update component status if provided
+            if (result.component_status) {
+                setComponentStatus(result.component_status);
+            }
+
+            // Remove from pending changes
+            setPendingCategoryChanges(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(boxId);
+                return newMap;
+            });
+
+            setError(''); // Clear any previous errors
+        } catch (error) {
+            setError(`Failed to change category: ${error.message}`);
+            console.error('Category change error:', error);
         }
     }, []);
 
@@ -436,7 +561,6 @@ const BarAnalyzer = () => {
                 {/* Right: Canvas viewer section */}
                 <CanvasViewer
                     canvasContainerRef={canvasManager.canvasContainerRef}
-                    onAddBox={handleAddBox}
                     selectedInfo={selectedInfo}
                     valueEditor={
                         <ValueEditor
@@ -455,6 +579,8 @@ const BarAnalyzer = () => {
                             onDelete={handleDeleteBox}
                             onSyncCoordinates={handleSyncCoordinates}
                             onCategoryChange={handleCategoryChange}
+                            onAddBox={handleAddBox}
+                            pendingChanges={pendingCategoryChanges.size}
                         />
                     }
                 >
