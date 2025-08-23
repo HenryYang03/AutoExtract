@@ -731,15 +731,25 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
             renderDetectionBoxes(canvas, detectionBoxes);
         }
 
-        // Setup add box button
-        const addBtn = document.getElementById('addBoxBtn');
-        if (addBtn) {
-            addBtn.onclick = () => addNewBox();
-        }
-
         // Cleanup on unmount
         return cleanup;
-    }, [imageUrl, imageShape, detectionBoxes, createCanvas, loadBackgroundImage, setupEventHandlers, renderDetectionBoxes, addNewBox, cleanup]);
+    }, [imageUrl, imageShape, detectionBoxes, createCanvas, loadBackgroundImage, setupEventHandlers, renderDetectionBoxes, cleanup]);
+
+    // Setup add box button handler (separate from main effect)
+    useEffect(() => {
+        const addBtn = document.getElementById('addBoxBtn');
+        if (addBtn) {
+            const handleAddBox = () => addNewBox();
+            addBtn.onclick = handleAddBox;
+
+            // Cleanup function
+            return () => {
+                if (addBtn) {
+                    addBtn.onclick = null;
+                }
+            };
+        }
+    }, [addNewBox]);
 
     return {
         canvasContainerRef,
