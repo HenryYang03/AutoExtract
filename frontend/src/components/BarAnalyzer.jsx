@@ -258,14 +258,12 @@ const BarAnalyzer = () => {
         try {
             setError(''); // Clear any previous errors
 
-            // CRITICAL FIX: Collect coordinates BEFORE setting sync flag
-            // This prevents coordinate functions from reading stale canvas data during sync
+            // Collect coordinates BEFORE setting sync flag to prevent stale data
             const modifiedCoordinates = canvasManager.getModifiedBoxCoordinates();
             const allCoordinates = canvasManager.getAllBoxCoordinates();
             const newBoxCoordinates = allCoordinates.filter(box => box.boxId.startsWith('temp_'));
 
-            // CRITICAL FIX: Filter out new boxes from modified coordinates to prevent duplication
-            // New boxes should only be processed once, not as both new AND modified
+            // Filter out new boxes from modified coordinates to prevent duplication
             const filteredModifiedCoordinates = modifiedCoordinates.filter(modifiedBox =>
                 !newBoxCoordinates.some(newBox => newBox.boxId === modifiedBox.boxId)
             );
@@ -273,24 +271,30 @@ const BarAnalyzer = () => {
             // Combine filtered modified and new box coordinates
             const coordinatesToSync = [...filteredModifiedCoordinates, ...newBoxCoordinates];
 
-            console.log(`Modified coordinates: ${modifiedCoordinates.length}, New coordinates: ${newBoxCoordinates.length}`);
-            console.log(`Filtered modified coordinates: ${filteredModifiedCoordinates.length}`);
-            console.log(`Total coordinates to sync: ${coordinatesToSync.length}`);
+            // DEBUG: Log the coordinates being sent for validation
+            console.log('=== DEBUG: Coordinates being validated ===');
+            console.log('Modified coordinates:', modifiedCoordinates);
+            console.log('All coordinates:', allCoordinates);
+            console.log('New box coordinates:', newBoxCoordinates);
+            console.log('Filtered modified coordinates:', filteredModifiedCoordinates);
+            console.log('Final coordinates to sync:', coordinatesToSync);
 
             if (coordinatesToSync.length === 0) {
                 console.log('No boxes to sync');
                 return;
             }
 
-            // NOW set sync flag to prevent useCanvasManager effect from running during sync
+            // Set sync flag to prevent useCanvasManager effect from running during sync
             canvasManager.setSyncing(true);
-            console.log('=== SYNC: Started - setSyncing(true) ===');
 
             // Validate coordinates before sync
             const validation = validateCoordinatesForSync(coordinatesToSync);
             if (!validation.valid) {
+                console.error('=== VALIDATION FAILED ===');
+                console.error('Error:', validation.error);
+                console.error('Invalid boxes:', validation.invalidBoxes);
                 setError(validation.error);
-                canvasManager.setSyncing(false); // Reset sync flag
+                canvasManager.setSyncing(false);
                 return;
             }
 
@@ -302,39 +306,24 @@ const BarAnalyzer = () => {
 
             if (syncResult.success) {
                 console.log('Sync successful:', syncResult.message);
-                setError(''); // Clear any previous errors
+                setError('');
 
                 // Clear pending category changes after successful sync
                 setPendingCategoryChanges(new Map());
 
                 // Handle new box IDs if any boxes were registered during sync
                 if (syncResult.newBoxes && syncResult.newBoxes.length > 0) {
-                    console.log('New boxes registered during sync:', syncResult.newBoxes);
-                    // Update canvas manager with new box IDs
                     canvasManager.updateBoxIds(syncResult.newBoxes);
                 }
 
-                // Update component status if provided (important for yaxis/xaxis detection)
+                // Update component status if provided
                 if (syncResult.componentStatus) {
-                    console.log('Updating component status after sync:', syncResult.componentStatus);
                     setComponentStatus(syncResult.componentStatus);
-                } else {
-                    console.warn('No component status received from sync!');
                 }
 
-                // Update detection boxes state with backend data (important for category persistence)
+                // Update detection boxes state with backend data
                 if (syncResult.detectionBoxes) {
-                    console.log('=== SYNC: Updating detection boxes state ===');
-                    console.log('Current detectionBoxes count:', detectionBoxes.length);
-                    console.log('New detectionBoxes from backend:', syncResult.detectionBoxes);
-                    console.log('New detectionBoxes count:', syncResult.detectionBoxes.length);
-
-                    // Don't manually clear the canvas - let the useCanvasManager effect handle re-rendering
-                    // This ensures proper cleanup and prevents duplicate boxes
                     setDetectionBoxes(syncResult.detectionBoxes);
-                    console.log('=== SYNC: setDetectionBoxes called ===');
-                } else {
-                    console.warn('No detection boxes received from sync!');
                 }
 
                 // Clear modification tracking after successful sync
@@ -353,7 +342,6 @@ const BarAnalyzer = () => {
 
                 // Reset sync flag after successful sync
                 canvasManager.setSyncing(false);
-                console.log('=== SYNC: Completed - setSyncing(false) ===');
             }
         } catch (error) {
             console.error('Sync failed:', error);
@@ -361,7 +349,6 @@ const BarAnalyzer = () => {
 
             // Reset sync flag on error
             canvasManager.setSyncing(false);
-            console.log('=== SYNC: Failed - setSyncing(false) ===');
         }
     }, [canvasManager, pendingCategoryChanges, selectedInfo]);
 
@@ -488,6 +475,12 @@ const BarAnalyzer = () => {
                 }
             }
 
+            // Also use the dedicated function for better reliability
+            const persisted = canvasManager.ensureCategoryPersisted(boxId, newCategory);
+            if (!persisted) {
+                console.warn(`Failed to persist category change for ${boxId} on canvas`);
+            }
+
             // Mark the box as modified for category change
             if (boxId.startsWith('temp_')) {
                 // For new boxes, we can't mark as modified yet since they don't have a permanent ID
@@ -539,6 +532,30 @@ const BarAnalyzer = () => {
         console.log('Detection boxes updated:', detectionBoxes);
     }, [detectionBoxes]);
 
+    /**
+     * Test function to validate the entire pipeline
+     * This helps debug issues with different operation sequences
+     */
+    const testPipeline = useCallback(() => {
+        console.log('=== PIPELINE TEST START ===');
+        console.log('Current state:');
+        console.log('- Detection boxes:', detectionBoxes.length);
+        console.log('- Pending category changes:', pendingCategoryChanges.size);
+        console.log('- Selected box:', selectedInfo);
+        console.log('- Component status:', componentStatus);
+
+        // Test coordinate collection
+        if (canvasManager.fabricCanvasRef.current) {
+            const modifiedCoords = canvasManager.getModifiedBoxCoordinates();
+            const allCoords = canvasManager.getAllBoxCoordinates();
+            console.log('- Modified coordinates:', modifiedCoords.length);
+            console.log('- All coordinates:', allCoords.length);
+            console.log('- Box ID map size:', canvasManager.boxIdMapRef.current.size);
+        }
+
+        console.log('=== PIPELINE TEST END ===');
+    }, [detectionBoxes, pendingCategoryChanges, selectedInfo, componentStatus, canvasManager]);
+
     return (
         <div className="container-fluid">
             <div className="row">
@@ -583,6 +600,7 @@ const BarAnalyzer = () => {
                             pendingChanges={pendingCategoryChanges.size}
                         />
                     }
+                    onTestPipeline={testPipeline}
                 >
                 </CanvasViewer>
             </div>

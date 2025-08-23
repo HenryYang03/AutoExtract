@@ -12,16 +12,27 @@ const CanvasViewer = ({
     selectedInfo,
     children,
     valueEditor,
-    selectionInfo
+    selectionInfo,
+    onTestPipeline
 }) => {
     return (
         <div className="col-lg-8 col-md-7 ps-lg-4 border-start">
-            {/* Header with title */}
-            <div className="mb-3">
+            {/* Header with title and debug button */}
+            <div className="mb-3 d-flex justify-content-between align-items-center">
                 <h5 className="mb-0">
                     <i className="bi bi-eye me-2"></i>
                     Interactive Detection Viewer
                 </h5>
+                {onTestPipeline && (
+                    <button
+                        className="btn btn-outline-secondary btn-sm"
+                        onClick={onTestPipeline}
+                        title="Test pipeline state"
+                    >
+                        <i className="bi bi-bug me-1"></i>
+                        Debug
+                    </button>
+                )}
             </div>
 
             {/* Instructions above canvas */}

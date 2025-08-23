@@ -233,7 +233,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
         // Store mapping between fabric object and backend ID
         if (boxId) {
             boxIdMapRef.current.set(rect, boxId);
-            console.log(`Created mapping: ${boxId} -> fabric object`, rect);
         } else {
             console.warn(`No boxId provided for label: ${label}`);
         }
@@ -251,25 +250,15 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      * @param {Array} detectionBoxes - Array of detection box data
      */
     const renderDetectionBoxes = useCallback((canvas, detectionBoxes) => {
-        console.log('=== RENDERING DETECTION BOXES ===');
-        console.log('Canvas objects before rendering:', canvas.getObjects().length);
-        console.log('Box ID map before rendering:', Array.from(boxIdMapRef.current.entries()));
-        console.log('Detection boxes to render:', detectionBoxes);
-
         const scale = scaleRef.current;
 
-        detectionBoxes.forEach((box, index) => {
-            console.log(`Rendering box ${index}:`, box);
+        detectionBoxes.forEach(box => {
             const x1 = box.x1 * scale;
             const y1 = box.y1 * scale;
             const width = (box.x2 - box.x1) * scale;
             const height = (box.y2 - box.y1) * scale;
             createDetectionBox(canvas, x1, y1, width, height, box.label, box.id);
         });
-
-        console.log('Canvas objects after rendering:', canvas.getObjects().length);
-        console.log('Box ID map after rendering:', Array.from(boxIdMapRef.current.entries()));
-        console.log('=== FINISHED RENDERING ===');
     }, [createDetectionBox]);
 
     /**
@@ -282,7 +271,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      */
     const markBoxAsModified = useCallback((boxId) => {
         modifiedBoxesRef.current.add(boxId);
-        console.log(`Marked box ${boxId} as modified`);
     }, []);
 
     /**
@@ -290,7 +278,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      */
     const clearModifiedTracking = useCallback(() => {
         modifiedBoxesRef.current.clear();
-        console.log('Cleared modification tracking');
     }, []);
 
     /**
@@ -328,7 +315,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
             const boxId = getBoxIdFromObject(obj);
             if (boxId) {
                 markBoxAsModified(boxId);
-                console.log(`Box ${boxId} was modified (moved/resized)`);
             }
         });
 
@@ -378,10 +364,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      * Clean up canvas resources
      */
     const cleanup = useCallback(() => {
-        console.log('=== CLEANUP STARTED ===');
-        console.log('Canvas objects before cleanup:', fabricCanvasRef.current?.getObjects().length || 'No canvas');
-        console.log('Box ID map before cleanup:', Array.from(boxIdMapRef.current.entries()));
-
         if (fabricCanvasRef.current) {
             fabricCanvasRef.current.dispose();
             fabricCanvasRef.current = null;
@@ -390,9 +372,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
             canvasContainerRef.current.innerHTML = '';
         }
         boxIdMapRef.current.clear(); // Clear the ID mapping on cleanup
-
-        console.log('=== CLEANUP COMPLETED ===');
-        console.log('Box ID map after cleanup:', Array.from(boxIdMapRef.current.entries()));
     }, []);
 
     /**
@@ -433,13 +412,9 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
         if (canvas) {
             // Create a temporary ID for the new box
             const tempId = `temp_${Date.now()}`;
-            console.log(`Creating new box with temporary ID: ${tempId} and label: ${label}`);
 
             // Create the box on canvas
             createDetectionBox(canvas, x, y, width, height, label, tempId);
-
-            // Verify the mapping was created
-            console.log(`Box ID mapping after creation:`, Array.from(boxIdMapRef.current.entries()));
 
             // Return the box data for backend processing
             const scale = scaleRef.current;
@@ -474,6 +449,13 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
 
             // Remove from ID mapping
             boxIdMapRef.current.delete(obj);
+
+            // Remove from modification tracking to prevent sync issues
+            if (boxId && modifiedBoxesRef.current.has(boxId)) {
+                modifiedBoxesRef.current.delete(boxId);
+                console.log(`Removed box ${boxId} from modification tracking`);
+            }
+
             canvas.remove(obj);
             canvas.requestRenderAll();
             if (onSelectionChange) onSelectionChange(null);
@@ -515,32 +497,38 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      */
     const getBoxCoordinates = useCallback((boxId) => {
         const canvas = fabricCanvasRef.current;
-        if (!canvas) {
-            console.log(`Canvas is null when looking for box ${boxId}`);
-            return null;
-        }
-
-        console.log(`Looking for box with ID: ${boxId}`);
-        console.log(`Current canvas has ${canvas.getObjects().length} objects`);
-        console.log(`Current boxIdMap entries:`, Array.from(boxIdMapRef.current.entries()));
-        console.log(`Canvas objects:`, canvas.getObjects().map(obj => ({
-            type: obj.type,
-            left: obj.left,
-            top: obj.top,
-            data: obj.data
-        })));
+        if (!canvas) return null;
 
         // Find the fabric object by ID
         for (const [obj, id] of boxIdMapRef.current.entries()) {
             if (id === boxId) {
-                console.log(`Found box ${boxId}, returning coordinates`);
                 return getOriginalCoordinates(obj);
             }
         }
-
-        console.log(`Box ${boxId} not found in boxIdMap`);
         return null;
     }, [getOriginalCoordinates]);
+
+    /**
+     * Ensure category changes are properly persisted on canvas objects
+     * @param {string} boxId - The box ID
+     * @param {string} newCategory - The new category
+     */
+    const ensureCategoryPersisted = useCallback((boxId, newCategory) => {
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) return false;
+
+        // Find the fabric object by ID
+        for (const [obj, id] of boxIdMapRef.current.entries()) {
+            if (id === boxId) {
+                if (obj.data) {
+                    obj.data.label = newCategory;
+                    console.log(`Persisted category change for ${boxId}: ${newCategory}`);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }, []);
 
     /**
      * Get only modified box coordinates for smart sync
@@ -548,10 +536,7 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      */
     const getModifiedBoxCoordinates = useCallback(() => {
         const canvas = fabricCanvasRef.current;
-        if (!canvas) {
-            console.log('Canvas is null when getting modified box coordinates');
-            return [];
-        }
+        if (!canvas) return [];
 
         const coordinates = [];
 
@@ -563,9 +548,30 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
                     const left = obj.left || 0;
                     const top = obj.top || 0;
 
-                    // Use getScaledWidth/getScaledHeight for accurate dimensions after resizing
-                    const width = obj.getScaledWidth ? obj.getScaledWidth() : (obj.width || 0);
-                    const height = obj.getScaledHeight ? obj.getScaledHeight() : (obj.height || 0);
+                    // Get the original dimensions and apply scaling manually
+                    // This ensures we get the correct dimensions without double-scaling issues
+                    const originalWidth = obj.width || 0;
+                    const originalHeight = obj.height || 0;
+                    const scaleX = obj.scaleX || 1;
+                    const scaleY = obj.scaleY || 1;
+
+                    // Calculate the actual scaled dimensions
+                    const width = originalWidth * scaleX;
+                    const height = originalHeight * scaleY;
+
+                    // DEBUG: Log the raw values for modified boxes
+                    console.log(`=== DEBUG: Modified Box ${boxId} coordinate calculation ===`);
+                    console.log('Raw left:', obj.left, 'Raw top:', obj.top);
+                    console.log('Original width:', originalWidth, 'Original height:', originalHeight);
+                    console.log('ScaleX:', scaleX, 'ScaleY:', scaleY);
+                    console.log('Calculated width:', width, 'Calculated height:', height);
+                    console.log('Scale factor:', scale);
+
+                    // Safety check: ensure we have valid dimensions
+                    if (!width || !height || width <= 0 || height <= 0) {
+                        console.warn(`Box ${boxId} has invalid dimensions: width=${width}, height=${height}`);
+                        continue; // Skip this box
+                    }
 
                     // Convert to original image coordinates and x1,y1,x2,y2 format
                     const x1 = Math.round(left / scale);
@@ -573,22 +579,24 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
                     const x2 = Math.round((left + width) / scale);
                     const y2 = Math.round((top + height) / scale);
 
-                    coordinates.push({
-                        boxId: boxId,
-                        coords: { x1, y1, x2, y2 },
-                        label: obj.data?.label || 'bar'
-                    });
+                    console.log('Calculated x1:', x1, 'y1:', y1, 'x2:', x2, 'y2:', y2);
 
-                    console.log(`Including modified box ${boxId} in sync with coords:`, { x1, y1, x2, y2 });
+                    // Final safety check: ensure calculated coordinates are valid
+                    if (x2 > x1 && y2 > y1) {
+                        coordinates.push({
+                            boxId: boxId,
+                            coords: { x1, y1, x2, y2 },
+                            label: obj.data?.label || 'bar'
+                        });
+                    } else {
+                        console.warn(`Box ${boxId} has invalid calculated coordinates: x1=${x1}, y1=${y1}, x2=${x2}, y2=${y2}`);
+                    }
                 } catch (error) {
                     console.error(`Error getting coordinates for modified box ${boxId}:`, error);
                 }
-            } else {
-                console.log(`Skipping unmodified box ${boxId} in sync`);
             }
         }
 
-        console.log(`Captured coordinates for ${coordinates.length} modified boxes`);
         return coordinates;
     }, []);
 
@@ -599,10 +607,7 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      */
     const getAllBoxCoordinates = useCallback(() => {
         const canvas = fabricCanvasRef.current;
-        if (!canvas) {
-            console.log('Canvas is null when getting box coordinates');
-            return [];
-        }
+        if (!canvas) return [];
 
         const coordinates = [];
 
@@ -613,9 +618,30 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
                 const left = obj.left || 0;
                 const top = obj.top || 0;
 
-                // Use getScaledWidth/getScaledHeight for accurate dimensions after resizing
-                const width = obj.getScaledWidth ? obj.getScaledWidth() : (obj.width || 0);
-                const height = obj.getScaledHeight ? obj.getScaledHeight() : (obj.height || 0);
+                // Get the original dimensions and apply scaling manually
+                // This ensures we get the correct dimensions without double-scaling issues
+                const originalWidth = obj.width || 0;
+                const originalHeight = obj.height || 0;
+                const scaleX = obj.scaleX || 1;
+                const scaleY = obj.scaleY || 1;
+
+                // Calculate the actual scaled dimensions
+                const width = originalWidth * scaleX;
+                const height = originalHeight * scaleY;
+
+                // DEBUG: Log the raw values being used for calculation
+                console.log(`=== DEBUG: Box ${boxId} coordinate calculation ===`);
+                console.log('Raw left:', obj.left, 'Raw top:', obj.top);
+                console.log('Original width:', originalWidth, 'Original height:', originalHeight);
+                console.log('ScaleX:', scaleX, 'ScaleY:', scaleY);
+                console.log('Calculated width:', width, 'Calculated height:', height);
+                console.log('Scale factor:', scale);
+
+                // Safety check: ensure we have valid dimensions
+                if (!width || !height || width <= 0 || height <= 0) {
+                    console.warn(`Box ${boxId} has invalid dimensions: width=${width}, height=${height}`);
+                    continue; // Skip this box
+                }
 
                 // Convert to original image coordinates and x1,y1,x2,y2 format
                 const x1 = Math.round(left / scale);
@@ -623,18 +649,23 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
                 const x2 = Math.round((left + width) / scale);
                 const y2 = Math.round((top + height) / scale);
 
-                coordinates.push({
-                    boxId: boxId,
-                    coords: { x1, y1, x2, y2 },
-                    label: obj.data?.label || 'bar' // Include label for new box registration
-                });
+                console.log('Calculated x1:', x1, 'y1:', y1, 'x2:', x2, 'y2:', y2);
+
+                // Final safety check: ensure calculated coordinates are valid
+                if (x2 > x1 && y2 > y1) {
+                    coordinates.push({
+                        boxId: boxId,
+                        coords: { x1, y1, x2, y2 },
+                        label: obj.data?.label || 'bar' // Include label for new box registration
+                    });
+                } else {
+                    console.warn(`Box ${boxId} has invalid calculated coordinates: x1=${x1}, y1=${y1}, x2=${x2}, y2=${y2}`);
+                }
             } catch (error) {
                 console.error(`Error getting coordinates for box ${boxId}:`, error);
             }
         }
 
-        console.log(`Captured final coordinates for ${coordinates.length} boxes`);
-        console.log('Final coordinates:', coordinates);
         return coordinates;
     }, []);
 
@@ -645,8 +676,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
     const updateBoxIds = useCallback((newBoxMappings) => {
         if (!newBoxMappings || newBoxMappings.length === 0) return;
 
-        console.log('Updating box ID mappings:', newBoxMappings);
-
         // Find fabric objects with old IDs and update their mappings
         for (const [obj, oldId] of boxIdMapRef.current.entries()) {
             const mapping = newBoxMappings.find(m => m.oldId === oldId);
@@ -654,7 +683,6 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
                 // Update the mapping to use the new backend ID
                 boxIdMapRef.current.delete(obj);
                 boxIdMapRef.current.set(obj, mapping.newId);
-                console.log(`Updated box ID mapping: ${oldId} -> ${mapping.newId}`);
 
                 // Also update the object's data to reflect the new permanent ID
                 if (obj.data) {
@@ -668,29 +696,25 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
      * No-op function for compatibility (no longer tracking modifications)
      */
     const clearModifiedBoxes = useCallback(() => {
-        console.log('No modification tracking to clear - using final state capture');
+        // No modification tracking to clear - using final state capture
+    }, []);
+
+    /**
+     * Set sync flag to prevent effect from running during sync operations
+     */
+    const setSyncing = useCallback((syncing) => {
+        isSyncingRef.current = syncing;
     }, []);
 
     // Main effect for canvas lifecycle
     useEffect(() => {
         // Skip effect execution if we're in the middle of a sync operation
         if (isSyncingRef.current) {
-            console.log('=== useCanvasManager effect SKIPPED - sync in progress ===');
             return;
         }
 
-        const timestamp = Date.now();
-        console.log(`=== useCanvasManager effect triggered at ${timestamp} ===`);
-        console.log('Parameters:', { imageUrl, imageShape, detectionBoxesCount: detectionBoxes.length });
-        console.log('Detection boxes:', detectionBoxes);
-        console.log('Effect dependencies changed:', { imageUrl: !!imageUrl, imageShape: !!imageShape, detectionBoxesCount: detectionBoxes.length });
+        if (!imageUrl || !imageShape.length) return;
 
-        if (!imageUrl || !imageShape.length) {
-            console.log('Missing required data, skipping canvas creation');
-            return;
-        }
-
-        console.log('Starting canvas setup...');
         // Cleanup previous canvas
         cleanup();
 
@@ -704,10 +728,7 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
 
         // Render detection boxes
         if (detectionBoxes.length > 0) {
-            console.log(`Rendering ${detectionBoxes.length} detection boxes:`, detectionBoxes);
             renderDetectionBoxes(canvas, detectionBoxes);
-        } else {
-            console.log('No detection boxes to render');
         }
 
         // Setup add box button
@@ -716,18 +737,9 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
             addBtn.onclick = () => addNewBox();
         }
 
-        console.log(`Canvas setup complete at ${timestamp}`);
         // Cleanup on unmount
         return cleanup;
     }, [imageUrl, imageShape, detectionBoxes, createCanvas, loadBackgroundImage, setupEventHandlers, renderDetectionBoxes, addNewBox, cleanup]);
-
-    /**
-     * Set sync flag to prevent effect from running during sync operations
-     */
-    const setSyncing = useCallback((syncing) => {
-        isSyncingRef.current = syncing;
-        console.log(`Sync flag set to: ${syncing}`);
-    }, []);
 
     return {
         canvasContainerRef,
@@ -745,6 +757,7 @@ export const useCanvasManager = (imageUrl, imageShape, detectionBoxes, onSelecti
         updateBoxIds,
         boxIdMapRef,
         setupSelectionHandler,
-        setSyncing
+        setSyncing,
+        ensureCategoryPersisted
     };
 }; 

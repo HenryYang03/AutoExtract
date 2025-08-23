@@ -13,20 +13,14 @@ import { updateBoxCoordinates, updateBoxCategory, addNewBox } from './apiService
  */
 export const syncAllBoxes = async (allCoordinates, pendingCategoryChanges = new Map()) => {
     try {
-        console.log(`Starting sync: ${allCoordinates.length} boxes, ${pendingCategoryChanges.size} category changes`);
-
         // Step 1: Register new boxes first
         const results = [];
         for (const { boxId, coords, label = 'bar' } of allCoordinates) {
             try {
                 if (boxId.startsWith('temp_')) {
                     // New box - register with backend
-                    console.log(`Registering new box: ${boxId} as ${label}`);
                     const boxData = { x1: coords.x1, y1: coords.y1, x2: coords.x2, y2: coords.y2, label };
-                    console.log('Sending box data to backend:', boxData);
-
                     const result = await addNewBox(boxData);
-                    console.log('Backend response:', result);
 
                     if (result.success) {
                         results.push({
@@ -37,13 +31,11 @@ export const syncAllBoxes = async (allCoordinates, pendingCategoryChanges = new 
                             componentStatus: result.component_status,
                             detectionBoxes: result.detection_boxes
                         });
-                        console.log(`Successfully registered: ${boxId} -> ${result.box_id}`);
                     } else {
                         throw new Error(`Failed to register new box: ${result.error}`);
                     }
                 } else {
                     // Existing box - update coordinates
-                    console.log(`Updating coordinates for: ${boxId}`);
                     const result = await updateBoxCoordinates(boxId, coords);
 
                     results.push({
@@ -68,26 +60,34 @@ export const syncAllBoxes = async (allCoordinates, pendingCategoryChanges = new 
 
         // Step 2: Apply category changes using permanent IDs
         if (pendingCategoryChanges.size > 0) {
-            console.log(`Applying ${pendingCategoryChanges.size} category changes...`);
-
             // Create mapping from temporary to permanent IDs
             const tempToPermMap = new Map();
             results.filter(r => r.isNew).forEach(r => {
                 tempToPermMap.set(r.boxId, r.newBoxId);
             });
 
-            for (const [boxId, newCategory] of pendingCategoryChanges.entries()) {
-                const actualBoxId = tempToPermMap.has(boxId) ? tempToPermMap.get(boxId) : boxId;
-                console.log(`Changing category: ${boxId} -> ${newCategory} (using ID: ${actualBoxId})`);
+            console.log(`Applying ${pendingCategoryChanges.size} category changes...`);
+            console.log('Temporary to permanent ID mapping:', Object.fromEntries(tempToPermMap));
 
-                const result = await updateBoxCategory(actualBoxId, newCategory);
-                if (result.success) {
-                    // Update the results with the latest component status and detection boxes
-                    const lastResult = results[results.length - 1];
-                    if (lastResult) {
-                        lastResult.componentStatus = result.component_status;
-                        lastResult.detectionBoxes = result.detection_boxes;
+            for (const [boxId, newCategory] of pendingCategoryChanges.entries()) {
+                try {
+                    const actualBoxId = tempToPermMap.has(boxId) ? tempToPermMap.get(boxId) : boxId;
+                    console.log(`Changing category: ${boxId} -> ${newCategory} (using ID: ${actualBoxId})`);
+
+                    const result = await updateBoxCategory(actualBoxId, newCategory);
+                    if (result.success) {
+                        console.log(`Successfully changed category for ${actualBoxId} to ${newCategory}`);
+                        // Update the results with the latest component status and detection boxes
+                        const lastResult = results[results.length - 1];
+                        if (lastResult) {
+                            lastResult.componentStatus = result.component_status;
+                            lastResult.detectionBoxes = result.detection_boxes;
+                        }
+                    } else {
+                        console.error(`Failed to change category for ${actualBoxId}:`, result.error);
                     }
+                } catch (error) {
+                    console.error(`Error applying category change for ${boxId}:`, error);
                 }
             }
         }
@@ -127,10 +127,31 @@ export const validateCoordinatesForSync = (coordinates) => {
     });
 
     if (invalidBoxes.length > 0) {
+        // Enhanced debugging: show exactly what's wrong with each invalid box
+        const detailedErrors = invalidBoxes.map(({ boxId, coords }) => {
+            const errors = [];
+            if (!boxId) errors.push('Missing boxId');
+            if (!coords) errors.push('Missing coords object');
+            if (coords) {
+                if (!coords.x1 && coords.x1 !== 0) errors.push('Missing or invalid x1');
+                if (!coords.y1 && coords.y1 !== 0) errors.push('Missing or invalid y1');
+                if (!coords.x2 && coords.x2 !== 0) errors.push('Missing or invalid x2');
+                if (!coords.y2 && coords.y2 !== 0) errors.push('Missing or invalid y2');
+                if (coords.x2 <= coords.x1) errors.push(`x2 (${coords.x2}) <= x1 (${coords.x1})`);
+                if (coords.y2 <= coords.y1) errors.push(`y2 (${coords.y2}) <= y1 (${coords.y1})`);
+            }
+            return { boxId, coords, errors };
+        });
+
+        console.error('=== DETAILED VALIDATION ERRORS ===');
+        detailedErrors.forEach(({ boxId, coords, errors }) => {
+            console.error(`Box ${boxId}:`, { coords, errors });
+        });
+
         return {
             valid: false,
             error: `${invalidBoxes.length} box(es) have invalid coordinates`,
-            invalidBoxes
+            invalidBoxes: detailedErrors
         };
     }
 
