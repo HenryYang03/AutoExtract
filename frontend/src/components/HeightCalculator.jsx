@@ -1,12 +1,5 @@
-/**
- * HeightCalculator Component
- * 
- * Displays a button to calculate heights and shows the results
- * including bar heights, uptail heights, and chart labels.
- */
-
 import React, { useState, useEffect } from 'react';
-import { calculateHeights, updateBarNames } from '../services/apiService';
+import { updateBarNames } from '../services/apiService';
 import { exportToCSV, exportToExcel } from '../utils/exportUtils';
 
 const HeightCalculator = ({
@@ -21,14 +14,10 @@ const HeightCalculator = ({
     const [editingBarNames, setEditingBarNames] = useState({});
     const [isUpdatingNames, setIsUpdatingNames] = useState(false);
 
-    // Clear editing state when results change (new image analyzed)
     useEffect(() => {
-        console.log('Results changed, clearing editing state');
         setEditingBarNames({});
     }, [results]);
-    /**
-     * Handle height calculation button click
-     */
+
     const handleCalculateClick = async () => {
         try {
             await onCalculate();
@@ -37,19 +26,10 @@ const HeightCalculator = ({
         }
     };
 
-    /**
-     * Handle bar name input change
-     */
     const handleBarNameChange = (index, value) => {
-        setEditingBarNames(prev => ({
-            ...prev,
-            [index]: value
-        }));
+        setEditingBarNames(prev => ({ ...prev, [index]: value }));
     };
 
-    /**
-     * Handle updating bar names
-     */
     const handleUpdateBarNames = async () => {
         if (!results) return;
 
@@ -59,19 +39,13 @@ const HeightCalculator = ({
             const chartData = results[chartLabel];
             const currentBarNames = chartData.bar_names || [];
 
-            // Get updated names (use edited ones or fall back to current)
             const updatedNames = currentBarNames.map((name, index) =>
                 editingBarNames[index] !== undefined ? editingBarNames[index] : name
             );
 
             await updateBarNames(updatedNames);
-
-            // Clear editing state
             setEditingBarNames({});
-
-            // Trigger a refresh of the results
             await onCalculate();
-
         } catch (error) {
             console.error('Failed to update bar names:', error);
         } finally {
@@ -79,69 +53,43 @@ const HeightCalculator = ({
         }
     };
 
-    /**
- * Convert results to long format for export
- */
     const convertToLongFormat = (results) => {
         const longFormatData = [];
-
         Object.entries(results).forEach(([chartLabel, chartData]) => {
             const { bar_heights, uptail_heights, bar_names } = chartData;
-
-            // Create one row per bar with mean (bar height), error (uptail height), and group (bar name)
             bar_heights.forEach((barHeight, index) => {
-                const uptailHeight = uptail_heights[index] || 0;
-                const groupName = bar_names[index] || `Bar ${index + 1}`;
-
                 longFormatData.push({
                     mean: barHeight,
-                    error: uptailHeight,
-                    group: groupName
+                    error: uptail_heights[index] || 0,
+                    group: bar_names[index] || `Bar ${index + 1}`
                 });
             });
         });
-
         return longFormatData;
     };
 
-    /**
-     * Get filename from chart label or use default
-     */
     const getFilename = () => {
         if (!results) return 'bar_analysis_results';
         const chartLabel = Object.keys(results)[0];
-        // Clean the label for filename (remove special characters, limit length)
-        const cleanLabel = chartLabel
+        return chartLabel
             ? chartLabel.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 50)
             : 'bar_analysis_results';
-        return cleanLabel || 'bar_analysis_results';
     };
 
-    /**
-     * Handle CSV export
-     */
     const handleExportCSV = () => {
-        if (!results) return;
-        const longFormatData = convertToLongFormat(results);
-        const filename = getFilename();
-        exportToCSV(longFormatData, filename);
+        if (results) {
+            exportToCSV(convertToLongFormat(results), getFilename());
+        }
     };
 
-    /**
-     * Handle Excel export
-     */
     const handleExportExcel = () => {
-        if (!results) return;
-        const longFormatData = convertToLongFormat(results);
-        const filename = getFilename();
-        exportToExcel(longFormatData, filename);
+        if (results) {
+            exportToExcel(convertToLongFormat(results), getFilename());
+        }
     };
 
-    /**
-     * Render bar heights list with editable names
-     */
     const renderBarHeights = (barHeights, barNames = []) => {
-        if (!barHeights || barHeights.length === 0) return null;
+        if (!barHeights?.length) return null;
 
         return (
             <div className="mb-3">
@@ -174,27 +122,23 @@ const HeightCalculator = ({
                 <ul className="list-group list-group-flush">
                     {barHeights.map((height, index) => {
                         const barName = barNames[index] || `Bar ${index + 1}`;
-                        const isEditing = editingBarNames[index] !== undefined;
-                        const displayName = isEditing ? editingBarNames[index] : barName;
+                        const displayName = editingBarNames[index] !== undefined ? editingBarNames[index] : barName;
 
                         return (
                             <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
-                                <div className="d-flex align-items-center gap-2">
-                                    <input
-                                        type="text"
-                                        className="form-control form-control-sm"
-                                        style={{ width: '120px' }}
-                                        value={displayName}
-                                        onChange={(e) => handleBarNameChange(index, e.target.value)}
-                                        onFocus={() => {
-                                            // Only set editing state if we don't already have an edited value
-                                            if (editingBarNames[index] === undefined) {
-                                                setEditingBarNames(prev => ({ ...prev, [index]: barName }));
-                                            }
-                                        }}
-                                        placeholder={`Bar ${index + 1}`}
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    className="form-control form-control-sm"
+                                    style={{ width: '120px' }}
+                                    value={displayName}
+                                    onChange={(e) => handleBarNameChange(index, e.target.value)}
+                                    onFocus={() => {
+                                        if (editingBarNames[index] === undefined) {
+                                            setEditingBarNames(prev => ({ ...prev, [index]: barName }));
+                                        }
+                                    }}
+                                    placeholder={`Bar ${index + 1}`}
+                                />
                                 <span className="badge bg-primary rounded-pill">
                                     {typeof height === 'number' ? height.toFixed(2) : height}
                                 </span>
@@ -206,11 +150,8 @@ const HeightCalculator = ({
         );
     };
 
-    /**
-     * Render uptail heights list
-     */
     const renderUptailHeights = (uptailHeights) => {
-        if (!uptailHeights || uptailHeights.length === 0) return null;
+        if (!uptailHeights?.length) return null;
 
         return (
             <div className="mb-3">
@@ -232,8 +173,6 @@ const HeightCalculator = ({
         );
     };
 
-
-
     return (
         <div className="mt-4 pt-3 border-top">
             <div className="d-flex align-items-center mb-3">
@@ -246,7 +185,6 @@ const HeightCalculator = ({
                 <strong>Ready to calculate?</strong> Once you are finished adjusting the detections, click here to obtain results.
             </div>
 
-            {/* Show warning when conversion errors exist */}
             {(originConversionError || ymaxConversionError) && (
                 <div className="alert alert-warning" role="alert">
                     <i className="bi bi-exclamation-triangle me-2"></i>
@@ -254,8 +192,7 @@ const HeightCalculator = ({
                 </div>
             )}
 
-            {/* Show warning when required components are missing */}
-            {componentStatus && !componentStatus.all_components_ready && componentStatus.missing_components && componentStatus.missing_components.length > 0 && (
+            {componentStatus && !componentStatus.all_components_ready && componentStatus.missing_components?.length > 0 && (
                 <div className="alert alert-danger" role="alert">
                     <i className="bi bi-x-circle me-2"></i>
                     <strong>Missing required components:</strong> {componentStatus.missing_components.join(', ')}.
@@ -289,7 +226,6 @@ const HeightCalculator = ({
                 </div>
             )}
 
-            {/* Results Display */}
             {results && Object.keys(results).length > 0 && (
                 <div className="mt-4">
                     <h6 className="text-success mb-3">
@@ -312,7 +248,6 @@ const HeightCalculator = ({
                         </div>
                     ))}
 
-                    {/* Export Buttons */}
                     <div className="mt-3">
                         <div className="d-flex gap-2">
                             <button
@@ -339,7 +274,6 @@ const HeightCalculator = ({
                             Data will be exported with columns: mean (bar height), error (uptail height), group (bar name)
                         </small>
 
-                        {/* Export Data Preview */}
                         <div className="mt-3">
                             <h6 className="text-info mb-2">
                                 <i className="bi bi-table me-2"></i>

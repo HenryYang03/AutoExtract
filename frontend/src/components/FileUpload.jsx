@@ -1,10 +1,3 @@
-/**
- * FileUpload Component
- * 
- * Handles file selection, validation, and submission for bar graph analysis.
- * Provides user feedback for upload status and errors.
- */
-
 import React, { useState } from 'react';
 import { validateFile } from '../services/apiService';
 import HeightCalculator from './HeightCalculator';
@@ -25,72 +18,42 @@ const FileUpload = ({
 }) => {
     const [dragActive, setDragActive] = useState(false);
 
-    /**
-     * Handle file selection from input
-     * @param {Event} event - Change event from file input
-     */
-    const handleFileInputChange = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            onFileChange(file);
-        }
+    const handleFileInputChange = (e) => {
+        const file = e.target.files[0];
+        if (file) onFileChange(file);
     };
 
-    /**
-     * Handle drag and drop events
-     * @param {DragEvent} event - Drag event
-     */
-    const handleDrag = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (event.type === 'dragenter' || event.type === 'dragover') {
-            setDragActive(true);
-        } else if (event.type === 'dragleave') {
-            setDragActive(false);
-        }
+    const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(e.type === 'dragenter' || e.type === 'dragover');
     };
 
-    /**
-     * Handle file drop
-     * @param {DragEvent} event - Drop event
-     */
-    const handleDrop = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         setDragActive(false);
 
-        const files = event.dataTransfer.files;
-        if (files && files[0]) {
-            const file = files[0];
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
             const validation = validateFile(file);
-
             if (validation.isValid) {
                 onFileChange(file);
             } else {
-                // You could add a toast notification here
                 console.error(validation.error);
             }
         }
     };
 
-    /**
-     * Handle form submission
-     * @param {Event} event - Form submit event
-     */
-    const handleSubmit = (event) => {
-        event.preventDefault();
-        if (filename && !isUploading) {
-            onUpload();
-        }
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (filename && !isUploading) onUpload();
     };
 
     return (
         <div className="col-lg-4 col-md-5 pe-lg-4">
             <h1>Bar Analyzer</h1>
-            <p className="text-muted">
-                Upload a bar graph image to detect all relevant components.
-            </p>
+            <p className="text-muted">Upload a bar graph image to detect all relevant components.</p>
 
             {error && (
                 <div className="alert alert-danger" role="alert">
@@ -144,9 +107,7 @@ const FileUpload = ({
                                 className="d-none"
                                 required
                             />
-                            <small className="text-muted">
-                                Supports PNG, JPEG, JPG (max 10MB)
-                            </small>
+                            <small className="text-muted">Supports PNG, JPEG, JPG (max 10MB)</small>
                         </div>
                     )}
                 </div>
@@ -154,9 +115,7 @@ const FileUpload = ({
 
             {filename && (
                 <div className="d-flex justify-content-between align-items-center">
-                    <small className="text-muted">
-                        Ready to analyze: {filename}
-                    </small>
+                    <small className="text-muted">Ready to analyze: {filename}</small>
                     <button
                         type="button"
                         className="btn btn-sm btn-outline-secondary"
@@ -167,7 +126,6 @@ const FileUpload = ({
                 </div>
             )}
 
-            {/* Height Calculator Section */}
             <HeightCalculator
                 onCalculate={onCalculateHeights}
                 isCalculating={isCalculating}
@@ -181,4 +139,4 @@ const FileUpload = ({
     );
 };
 
-export default FileUpload; 
+export default FileUpload;

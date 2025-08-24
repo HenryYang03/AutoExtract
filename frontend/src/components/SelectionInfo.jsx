@@ -1,13 +1,13 @@
-/**
- * SelectionInfo Component
- * 
- * Displays information about the currently selected detection box,
- * including category, coordinates, and actions like deletion.
- */
-
 import React from 'react';
 
-const SelectionInfo = ({ selectedInfo, onDelete, onSyncCoordinates, onCategoryChange, onAddBox, pendingChanges = 0 }) => {
+const SelectionInfo = ({
+    selectedInfo,
+    onDelete,
+    onSyncCoordinates,
+    onCategoryChange,
+    onAddBox,
+    pendingChanges = 0
+}) => {
     const hasSelection = !!selectedInfo;
     const { label, coords } = selectedInfo || {};
 
@@ -16,7 +16,6 @@ const SelectionInfo = ({ selectedInfo, onDelete, onSyncCoordinates, onCategoryCh
             <div className="flex-grow-1">
                 <div className="row align-items-center">
                     {hasSelection ? (
-                        // Show full selection info when a box is selected
                         <>
                             <div className="col-md-8">
                                 <div className="d-flex align-items-center gap-3">
@@ -28,11 +27,9 @@ const SelectionInfo = ({ selectedInfo, onDelete, onSyncCoordinates, onCategoryCh
                                                 style={{ width: 'auto' }}
                                                 value={label}
                                                 onChange={(e) => {
-                                                    // Store the new category but don't apply it yet
                                                     const newCategory = e.target.value;
                                                     if (newCategory !== label) {
-                                                        // Update local selection info for display
-                                                        onCategoryChange(selectedInfo.boxId, newCategory, false); // false = don't apply yet
+                                                        onCategoryChange(selectedInfo.boxId, newCategory, false);
                                                     }
                                                 }}
                                             >
@@ -96,7 +93,6 @@ const SelectionInfo = ({ selectedInfo, onDelete, onSyncCoordinates, onCategoryCh
                             </div>
                         </>
                     ) : (
-                        // Show minimal info when no box is selected
                         <>
                             <div className="col-md-8">
                                 <div className="d-flex align-items-center">
@@ -136,4 +132,4 @@ const SelectionInfo = ({ selectedInfo, onDelete, onSyncCoordinates, onCategoryCh
     );
 };
 
-export default SelectionInfo; 
+export default SelectionInfo;

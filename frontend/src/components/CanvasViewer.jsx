@@ -37,7 +37,7 @@ const CanvasViewer = ({
 
             {/* Instructions above canvas */}
             <div className="mb-3">
-                <div className="alert alert-info py-2">
+                <div className="info-panel-thin">
                     <small className="text-info">
                         <i className="bi bi-info-circle me-2"></i>
                         <strong>How to adjust detection boxes:</strong>

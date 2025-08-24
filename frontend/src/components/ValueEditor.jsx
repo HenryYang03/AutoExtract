@@ -1,27 +1,23 @@
-/**
- * ValueEditor Component
- * 
- * Provides an interface for editing origin and ymax values used in
- * bar graph calculations. Shows current values and allows updates.
- */
-
 import React, { useState, useEffect } from 'react';
 
-const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConversionError, onUpdate, isUpdating = false, hasDetections = false }) => {
+const ValueEditor = ({
+    originValue,
+    ymaxValue,
+    originConversionError,
+    ymaxConversionError,
+    onUpdate,
+    isUpdating = false,
+    hasDetections = false
+}) => {
     const [editingOrigin, setEditingOrigin] = useState('');
     const [editingYmax, setEditingYmax] = useState('');
     const [validationErrors, setValidationErrors] = useState({});
 
-    // Update local state when props change
     useEffect(() => {
         setEditingOrigin(originValue || '');
         setEditingYmax(ymaxValue || '');
     }, [originValue, ymaxValue]);
 
-    /**
-     * Validate input values
-     * @returns {boolean} True if all inputs are valid
-     */
     const validateInputs = () => {
         const errors = {};
 
@@ -43,9 +39,6 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
         return Object.keys(errors).length === 0;
     };
 
-    /**
-     * Handle update button click
-     */
     const handleUpdate = () => {
         if (validateInputs()) {
             onUpdate({
@@ -55,11 +48,6 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
         }
     };
 
-    /**
-     * Handle input changes with validation
-     * @param {string} field - Field name ('origin' or 'ymax')
-     * @param {string} value - New input value
-     */
     const handleInputChange = (field, value) => {
         if (field === 'origin') {
             setEditingOrigin(value);
@@ -67,7 +55,6 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
             setEditingYmax(value);
         }
 
-        // Clear validation error for this field
         if (validationErrors[field]) {
             setValidationErrors(prev => ({
                 ...prev,
@@ -76,10 +63,7 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
         }
     };
 
-    // Don't render if no detections exist
-    if (!hasDetections) {
-        return null;
-    }
+    if (!hasDetections) return null;
 
     return (
         <div className="alert alert-secondary mb-3">
@@ -91,8 +75,7 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
                             <div className="position-relative">
                                 <input
                                     type="number"
-                                    className={`form-control form-control-sm ${validationErrors.ymax ? 'is-invalid' : ''
-                                        }`}
+                                    className={`form-control form-control-sm ${validationErrors.ymax ? 'is-invalid' : ''}`}
                                     placeholder="ymax"
                                     value={editingYmax}
                                     onChange={(e) => handleInputChange('ymax', e.target.value)}
@@ -112,8 +95,7 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
                             <div className="position-relative">
                                 <input
                                     type="number"
-                                    className={`form-control form-control-sm ${validationErrors.origin ? 'is-invalid' : ''
-                                        }`}
+                                    className={`form-control form-control-sm ${validationErrors.origin ? 'is-invalid' : ''}`}
                                     placeholder="origin"
                                     value={editingOrigin}
                                     onChange={(e) => handleInputChange('origin', e.target.value)}
@@ -148,7 +130,6 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
                 </div>
             </div>
 
-            {/* Current stored values display */}
             <div className="mt-2 pt-2 border-top">
                 <small className="text-muted">
                     <strong>Current stored values:</strong>
@@ -157,23 +138,18 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
                     <div className="col-6">
                         <small className="text-muted">ymax:</small>
                         <div className="fw-bold text-primary">
-                            {ymaxValue ? ymaxValue : (
-                                <span className="text-muted">Not detected - please input manually</span>
-                            )}
+                            {ymaxValue || <span className="text-muted">Not detected - please input manually</span>}
                         </div>
                     </div>
                     <div className="col-6">
                         <small className="text-muted">origin:</small>
                         <div className="fw-bold text-primary">
-                            {originValue ? originValue : (
-                                <span className="text-muted">Not detected - please input manually</span>
-                            )}
+                            {originValue || <span className="text-muted">Not detected - please input manually</span>}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Conversion error messages */}
             {(originConversionError || ymaxConversionError) && (
                 <div className="mt-2 pt-2 border-top">
                     {originConversionError && (
@@ -198,4 +174,4 @@ const ValueEditor = ({ originValue, ymaxValue, originConversionError, ymaxConver
     );
 };
 
-export default ValueEditor; 
+export default ValueEditor;
