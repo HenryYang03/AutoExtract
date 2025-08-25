@@ -717,39 +717,7 @@ const TutorialPage = () => {
         </div>
       </div>
 
-      {/* Navigation Buttons */}
-      <div className="card border-0 shadow-sm">
-        <div className="card-body">
-          <div className="d-flex justify-content-between align-items-center">
-            <button
-              className="btn btn-outline-secondary"
-              onClick={() => setActiveStep(Math.max(0, activeStep - 1))}
-              disabled={activeStep === 0}
-            >
-              <i className="bi bi-arrow-left me-2"></i>Previous
-            </button>
 
-            <div className="text-center">
-              <span className="badge bg-primary">
-                {activeStep + 1} of {tutorialSteps.length}
-              </span>
-            </div>
-
-            {activeStep < tutorialSteps.length - 1 ? (
-              <button
-                className="btn btn-primary"
-                onClick={() => setActiveStep(Math.min(tutorialSteps.length - 1, activeStep + 1))}
-              >
-                Next<i className="bi bi-arrow-right ms-2"></i>
-              </button>
-            ) : (
-              <Link to="/bar_analyzer" className="btn btn-success">
-                <i className="bi bi-rocket-takeoff me-2"></i>Start Analyzer
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
