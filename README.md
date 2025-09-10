@@ -1,6 +1,6 @@
 # AutoExtract
 
-A local-first web app that uses deep learning and OCR to extract data from scientific plots (currently focused on bar graphs). The backend runs on Flask with a YOLO-based detector and OCR; the frontend is a Vite + React app with an interactive canvas powered by Fabric.js.
+A web app that uses deep learning and OCR to extract data from scientific plots (currently focused on bar graphs). The backend runs on Flask with a YOLO-based detector and OCR; the frontend is a Vite + React app with an interactive canvas powered by Fabric.js.
 
 Status: Runs locally today. Deployment is in progress.
 
@@ -24,7 +24,6 @@ Status: Runs locally today. Deployment is in progress.
 
 ## Conda Environment Setup
 
-Fast path (recommended):
 ```bash
 bash scripts/create_conda_env.sh  # creates env: AutoExtract (python 3.12) and installs deps
 conda activate AutoExtract
@@ -107,20 +106,10 @@ Frontend (`frontend/`)
 - `src/components/BarAnalyzer.jsx`: Main interactive viewer (Fabric.js)
 - Proxy config in `vite.config.js` to reach Flask during development
 
-## Troubleshooting
-
-- Tesseract not found: `brew install tesseract` and restart the backend
-- Weights missing: place your YOLOv5 weights at `backend/models/best.pt`
-- Backend port busy: change `PORT` in `backend/config.py`
-- Frontend cannot reach backend: ensure backend is on `http://localhost:9000` and Vite proxy is unchanged
-- Conda env not active: `conda activate AutoExtract`
-
 ## Roadmap
 
 - Deployment (Docker + cloud runtime)
 - Additional analyzers (box plots, line plots)
-- Project-level persistence for edited annotations
-- Export data (CSV/JSON) and image snapshots
 - Authentication and multi-user sessions
 
 ## Acknowledgements
@@ -130,4 +119,4 @@ Frontend (`frontend/`)
 - Fabric.js (interactive canvas)
 
 ---
-For questions or suggestions, please open an issue or PR. Thank you for trying AutoExtract!
+Thank you for trying AutoExtract!
