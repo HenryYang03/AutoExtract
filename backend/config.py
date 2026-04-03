@@ -25,8 +25,8 @@ CLASS_NAMES = [
 # Flask configuration
 SECRET_KEY = "b'\xca\xa4\xf2\x80!\xfe\x85\xba\xd7\xcf\xe7\xc9\xf1)I\xac\x10Y5M\x95\xed\xfb\xc4'"
 HOST = "0.0.0.0"
-PORT = 9000
-DEBUG = True
+PORT = int(os.environ.get("PORT", "9000"))
+DEBUG = os.environ.get("DEBUG", "true").lower() in ("1", "true", "yes")
 
 # OCR configuration
 TESSERACT_CMD = 'tesseract' 

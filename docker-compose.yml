@@ -1,0 +1,11 @@
+# Requires ./backend/models/best.pt on the host (gitignored). Create that file before `compose up`,
+# or Docker may create an empty directory at that path and the model will still fail to load.
+services:
+  autoextract:
+    build: .
+    ports:
+      - "9000:9000"
+    environment:
+      DEBUG: "false"
+    volumes:
+      - ./backend/models/best.pt:/app/backend/models/best.pt:ro

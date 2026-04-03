@@ -1517,6 +1517,57 @@ small.text-info i {
   color: var(--text-primary) !important;
 }
 
+/* Column Layout Overflow Prevention */
+.col-lg-8.col-md-7.ps-lg-4.border-start {
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.col-lg-8.col-md-7.ps-lg-4.border-start .alert {
+  overflow: hidden;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.col-lg-8.col-md-7.ps-lg-4.border-start .form-select {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.col-lg-8.col-md-7.ps-lg-4.border-start .btn-group {
+  flex-wrap: wrap;
+}
+
+.col-lg-8.col-md-7.ps-lg-4.border-start .btn {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .col-lg-8.col-md-7.ps-lg-4.border-start {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .col-lg-8.col-md-7.ps-lg-4.border-start .alert {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .col-lg-8.col-md-7.ps-lg-4.border-start .btn-group {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .col-lg-8.col-md-7.ps-lg-4.border-start .btn {
+    flex: 1;
+    min-width: auto;
+  }
+}
+
 /* Height Calculator Specific Overrides */
 .d-flex .text-primary,
 .card-header .text-primary,

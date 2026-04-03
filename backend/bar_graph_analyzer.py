@@ -32,8 +32,13 @@ class BarGraphAnalyzer:
         if pytesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = pytesseract_cmd
 
-        # Load YOLOv5 custom model from torch hub
-        self.model: Any = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path)
+        # Load YOLOv5 custom model from torch hub (repo is cached after first download; Docker image pre-warms this)
+        self.model: Any = torch.hub.load(
+            'ultralytics/yolov5',
+            'custom',
+            path=model_path,
+            trust_repo=True,
+        )
         self.class_names = class_names
 
         # Runtime state populated per image

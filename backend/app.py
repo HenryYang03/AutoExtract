@@ -14,7 +14,7 @@ Author: Mohan Yang
 Repository: https://github.com/HenryYang03/AutoExtract.git
 """
 
-from flask import Flask, jsonify
+from flask import Flask, abort, jsonify, send_from_directory
 import os
 
 from config import UPLOAD_DIR, SECRET_KEY, HOST, PORT, DEBUG
@@ -48,11 +48,50 @@ def create_app() -> Flask:
     
     # Register routes
     register_routes(app)
+
+    # Production: serve Vite build from FRONTEND_DIST (same origin as /api)
+    register_frontend_spa(app)
     
     # Register error handlers
     register_error_handlers(app)
     
     return app
+
+
+def register_frontend_spa(app: Flask) -> None:
+    """Serve the built React app when FRONTEND_DIST points at `vite build` output."""
+    dist_dir = os.environ.get("FRONTEND_DIST", "").strip()
+    if not dist_dir or not os.path.isdir(dist_dir):
+        return
+
+    dist_real = os.path.realpath(dist_dir)
+
+    def _under_dist(candidate: str) -> bool:
+        cr = os.path.realpath(candidate)
+        return cr == dist_real or cr.startswith(dist_real + os.sep)
+
+    @app.route("/assets/<path:filename>")
+    def spa_assets(filename):
+        assets = os.path.join(dist_dir, "assets")
+        if not os.path.isdir(assets):
+            abort(404)
+        target = os.path.join(assets, filename)
+        if not _under_dist(target) or not os.path.isfile(target):
+            abort(404)
+        return send_from_directory(assets, filename)
+
+    @app.route("/", defaults={"spa_path": ""})
+    @app.route("/<path:spa_path>")
+    def spa_catch_all(spa_path):
+        if spa_path.startswith("api/"):
+            abort(404)
+        if spa_path.startswith("static/uploads/"):
+            abort(404)
+        if spa_path:
+            target = os.path.normpath(os.path.join(dist_dir, spa_path))
+            if _under_dist(target) and os.path.isfile(target):
+                return send_from_directory(dist_dir, spa_path)
+        return send_from_directory(dist_dir, "index.html")
 
 
 def register_routes(app: Flask) -> None:

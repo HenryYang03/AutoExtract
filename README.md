@@ -1,8 +1,19 @@
 # AutoExtract
 
-A web app that uses deep learning and OCR to extract data from scientific plots (currently focused on bar graphs). The backend runs on Flask with a YOLO-based detector and OCR; the frontend is a Vite + React app with an interactive canvas powered by Fabric.js.
+A web app that uses deep learning and OCR to extract data from scientific plots. The backend runs on Flask with a YOLO-based detector and OCR; the frontend is a Vite + React app with an interactive canvas powered by Fabric.js.
 
-Status: Runs locally today. Deployment is in progress.
+## Quick Start
+
+**Pull and run**
+
+```bash
+docker pull yanghenry/autoextract:latest
+docker run --rm -p 9000:9000 \
+  -v /absolute/path/on/host/best.pt:/app/backend/models/best.pt:ro \
+  yanghenry/autoextract:latest
+```
+
+The image bundles the production-built frontend and the Flask API on port **9000**. YOLO weights (`backend/models/best.pt`) are **not** in the repository; mount your own file at runtime.
 
 ## Features
 
@@ -11,61 +22,6 @@ Status: Runs locally today. Deployment is in progress.
 - External info panel shows selected box category and coordinates (original image pixels)
 - Edit ymax and origin values via inputs and Update button (persists to backend for current session)
 - Add new boxes and delete the selected box
-
-## Prerequisites
-
-- Python 3.12 (recommended via Conda)
-- Node.js 18+ and npm
-- Tesseract OCR (macOS):
-  ```bash
-  brew install tesseract
-  ```
-- Model weights at `backend/models/best.pt` (YOLOv5 custom weights)
-
-## Conda Environment Setup
-
-```bash
-bash scripts/create_conda_env.sh  # creates env: AutoExtract (python 3.12) and installs deps
-conda activate AutoExtract
-```
-
-Manual setup:
-```bash
-conda create -y -n AutoExtract python=3.12
-conda activate AutoExtract
-pip install -r requirements.txt
-```
-
-## Quick Start (Local)
-
-1) Backend
-```bash
-# from repo root
-conda activate AutoExtract
-python backend/app.py  # Flask at http://localhost:9000
-```
-
-2) Frontend
-```bash
-# new terminal tab/window
-conda activate AutoExtract  # optional; keep environments consistent
-cd frontend
-npm install
-npm run dev  # opens http://localhost:5173
-```
-
-Notes
-- The frontend dev server proxies requests to the backend (see `frontend/vite.config.js`):
-  - `/api` → `http://localhost:9000`
-  - `/static` → `http://localhost:9000`
-
-## Using the App
-
-1. Open `http://localhost:5173`
-2. Choose an image file of a bar graph and click Upload
-3. Select any detection box in the canvas to view its label and coordinates
-4. Adjust `ymax` and `origin` in the inputs at the top of the viewer and click Update
-5. Use “+ Add Box” to add a new rectangle, or “Delete Selected” to remove the active one
 
 ## API Overview
 
@@ -106,11 +62,6 @@ Frontend (`frontend/`)
 - `src/components/BarAnalyzer.jsx`: Main interactive viewer (Fabric.js)
 - Proxy config in `vite.config.js` to reach Flask during development
 
-## Roadmap
-
-- Deployment (Docker + cloud runtime)
-- Additional analyzers (box plots, line plots)
-- Authentication and multi-user sessions
 
 ## Acknowledgements
 
@@ -118,5 +69,3 @@ Frontend (`frontend/`)
 - Flask (backend) and React + Vite (frontend)
 - Fabric.js (interactive canvas)
 
----
-Thank you for trying AutoExtract!

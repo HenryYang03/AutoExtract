@@ -7,10 +7,16 @@ pytesseract==0.3.10
 Pillow==10.3.0
 imutils==0.5.4
 numpy==1.26.4
+pandas>=2.0.0
 
-# Deep learning (YOLOv5 via torch.hub)
+# Deep learning (YOLOv5 via torch.hub; upstream hubconf imports ultralytics)
 torch==2.3.0
 torchvision==0.18.0
+ultralytics>=8.0.0
+# YOLOv5 hub models/yolo.py -> utils/plots (matplotlib, seaborn, scipy.ndimage)
+matplotlib>=3.3
+seaborn>=0.11.0
+scipy>=1.4.1
 
 # Utilities
 requests==2.32.3
