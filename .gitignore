@@ -59,8 +59,9 @@ backend/static/uploads/
 backend/*.db
 backend/*.sqlite3
 
-# Model weights and large data
+# Model weights and large data (default checkpoint is tracked; ignore other exports)
 backend/models/*.pt
+!backend/models/best.pt
 backend/models/*.pth
 backend/models/*.onnx
 backend/models/*.tflite

@@ -40,8 +40,8 @@ class ModelManager:
         if not os.path.isfile(MODEL_PATH):
             self._init_error = (
                 f"Model weights missing at {MODEL_PATH}. "
-                "Copy best.pt into backend/models/ or mount it in Docker, e.g. "
-                "-v /path/to/best.pt:/app/backend/models/best.pt:ro"
+                "Restore backend/models/best.pt or rebuild the Docker image. "
+                "To use custom weights: -v /path/to/best.pt:/app/backend/models/best.pt:ro"
             )
             print(f"Failed to initialize BarGraphAnalyzer: {self._init_error}")
             return

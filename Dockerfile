@@ -1,5 +1,6 @@
 # Build: docker build -t yourdockerhub/autoextract:latest .
-# Run:  docker run --rm -p 9000:9000 -v /path/to/best.pt:/app/backend/models/best.pt:ro yourdockerhub/autoextract:latest
+# Run:  docker run --rm -p 9000:9000 yourdockerhub/autoextract:latest
+# Optional custom weights: -v /path/to/best.pt:/app/backend/models/best.pt:ro
 
 FROM node:22-bookworm-slim AS frontend-build
 WORKDIR /app/frontend
@@ -28,6 +29,8 @@ RUN pip install --no-cache-dir -r requirements.txt "gunicorn>=22.0.0"
 RUN python -c "import torch; torch.hub.load('ultralytics/yolov5', 'yolov5n', pretrained=False, trust_repo=True)"
 
 COPY backend/ ./backend/
+# Fail fast if default weights are missing from build context (see backend/models/best.pt in repo)
+RUN test -f /app/backend/models/best.pt
 COPY --from=frontend-build /app/frontend/dist ./frontend_dist
 
 ENV PYTHONPATH=/app/backend \

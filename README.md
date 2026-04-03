@@ -4,16 +4,24 @@ A web app that uses deep learning and OCR to extract data from scientific plots.
 
 ## Quick Start
 
-**Pull and run**
+**Pull and run** (default YOLO weights are inside the image)
 
 ```bash
 docker pull yanghenry/autoextract:latest
+docker run --rm -p 9000:9000 yanghenry/autoextract:latest
+```
+
+Open **http://localhost:9000**.
+
+**Use your own weights** (optional): bind-mount over the default file path.
+
+```bash
 docker run --rm -p 9000:9000 \
   -v /absolute/path/on/host/best.pt:/app/backend/models/best.pt:ro \
   yanghenry/autoextract:latest
 ```
 
-The image bundles the production-built frontend and the Flask API on port **9000**. YOLO weights (`backend/models/best.pt`) are **not** in the repository; mount your own file at runtime.
+The image bundles the production-built frontend, the Flask API, and **`backend/models/best.pt`** from this repository so a volume is not required.
 
 ## Features
 
